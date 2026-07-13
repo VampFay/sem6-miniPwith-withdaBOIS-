@@ -1,0 +1,20 @@
+import numpy as np
+
+from src.inference import postprocess_instances
+
+
+def test_postprocessing_separates_two_distance_peaks() -> None:
+    yy, xx = np.mgrid[:64, :64]
+    first = np.exp(-((xx - 23) ** 2 + (yy - 32) ** 2) / 80)
+    second = np.exp(-((xx - 41) ** 2 + (yy - 32) ** 2) / 80)
+    distance = np.maximum(first, second).astype(np.float32)
+    foreground = ((xx - 23) ** 2 + (yy - 32) ** 2 < 14**2) | (
+        (xx - 41) ** 2 + (yy - 32) ** 2 < 14**2
+    )
+    instances = postprocess_instances(foreground.astype(np.float32), distance)
+    assert set(np.unique(instances)) == {0, 1, 2}
+
+
+def test_postprocessing_handles_empty_prediction() -> None:
+    empty = np.zeros((32, 32), dtype=np.float32)
+    assert np.count_nonzero(postprocess_instances(empty, empty)) == 0

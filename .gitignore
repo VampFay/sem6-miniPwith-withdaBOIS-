@@ -1,0 +1,56 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Python environments and caches
+.venv/
+.venv.*/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Build and editor artifacts
+build/
+dist/
+*.egg-info/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.ipynb_checkpoints/
+
+# JavaScript dependencies and browser automation
+web/node_modules/
+web/.attndist-install-stamp
+node_modules/
+.vite/
+*.tsbuildinfo
+.playwright-mcp/
+
+# Data, model artifacts, and generated results
+data/
+outputs/
+outputs_v2/
+test_outputs/
+error_screenshot-logs/
+report-imgs/
+report-imgs copy/
+pptNreport/
+*.svs
+*.tif
+*.tiff
+*.ndpi
+*.pth
+*.pt
+*.h5
+*.npz
+*.npy
+*.parquet
+*.log
