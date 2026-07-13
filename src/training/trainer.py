@@ -155,7 +155,9 @@ class Trainer:
         )
 
     def resume(self, path: Path) -> None:
-        checkpoint = torch.load(path, map_location=self.config.device, weights_only=False)
+        # RNG state is always a CPU ByteTensor. Loading the complete training
+        # state onto MPS makes torch.set_rng_state reject that tensor.
+        checkpoint = torch.load(path, map_location="cpu", weights_only=False)
         if checkpoint.get("format_version") != 2:
             raise ValueError(f"Unsupported checkpoint format: {checkpoint.get('format_version')}")
         if checkpoint.get("artifact_type") != "attn-dist-training":
