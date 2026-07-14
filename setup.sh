@@ -4,6 +4,7 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export NO_ALBUMENTATIONS_UPDATE="${NO_ALBUMENTATIONS_UPDATE:-1}"
 VENV_DIR="${ATTNDIST_VENV_DIR:-$ROOT/.venv}"
+export MPLCONFIGDIR="${MPLCONFIGDIR:-$VENV_DIR/.matplotlib}"
 STAMP_FILE="$VENV_DIR/.attndist-install-stamp"
 UI_DIR="$ROOT/web"
 UI_STAMP_FILE="$UI_DIR/.attndist-install-stamp"
@@ -120,6 +121,7 @@ has_dataset() {
 find_checkpoint() {
   local candidate
   for candidate in \
+    "$ROOT/outputs_v2/checkpoints/best_iou_calibrated.pt" \
     "$ROOT/outputs_v2/checkpoints/best_iou.pt" \
     "$ROOT/outputs_v2/checkpoints/best_model.pth"; do
     if [[ -f "$candidate" ]]; then
@@ -156,16 +158,16 @@ doctor() {
 validate_data() {
   ensure_environment
   has_dataset || die "Missing data/pannuke/{images,instances,folds}.npy"
-  "$PYTHON" "$ROOT/scripts/validate_dataset.py" --require-complete
+  (cd "$ROOT" && "$PYTHON" -m scripts.validate_dataset --require-complete)
 }
 
 prepare_data() {
   ensure_environment
-  (cd "$ROOT" && "$PYTHON" "$ROOT/scripts/prepare_pannuke.py" "${@:2}" --preflight)
+  (cd "$ROOT" && "$PYTHON" -m scripts.prepare_pannuke "${@:2}" --preflight)
   info "Installing dataset preparation support"
   (cd "$ROOT" && PIP_DISABLE_PIP_VERSION_CHECK=1 "$PYTHON" -m pip install --no-cache-dir -e '.[data]')
   cd "$ROOT"
-  exec "$PYTHON" "$ROOT/scripts/prepare_pannuke.py" "${@:2}"
+  exec "$PYTHON" -m scripts.prepare_pannuke "${@:2}"
 }
 
 check_project() {
@@ -238,6 +240,17 @@ evaluate_model() {
   exec "$PYTHON" "$ROOT/evaluate.py" "$checkpoint" "${@:3}"
 }
 
+tune_postprocessing() {
+  local checkpoint="${2:-}"
+  ensure_environment
+  has_dataset || die "Postprocessing tuning requires prepared PanNuke arrays in data/pannuke"
+  if [[ -z "$checkpoint" ]]; then
+    checkpoint="$(find_checkpoint)" || die "No checkpoint found"
+  fi
+  cd "$ROOT"
+  exec "$PYTHON" -m scripts.tune_postprocessing "$checkpoint" "${@:3}"
+}
+
 usage() {
   cat <<'EOF'
 Usage: ./setup.sh [command] [arguments]
@@ -251,6 +264,7 @@ Commands:
   prepare-data [...]    Stream and prepare the pinned PanNuke release
   train [options]       Run train.py with the supplied options
   evaluate [path] [...] Evaluate a checkpoint, auto-discovering it when omitted
+  tune [path] [...]     Tune postprocessing on validation fold 2 only
   all                   Run checks, validate data when present, then start the app
   help                  Show this message
 
@@ -273,6 +287,7 @@ case "$command" in
   prepare-data) prepare_data "$@" ;;
   train) train_model "$@" ;;
   evaluate) evaluate_model "$@" ;;
+  tune) tune_postprocessing "$@" ;;
   all)
     check_project
     doctor

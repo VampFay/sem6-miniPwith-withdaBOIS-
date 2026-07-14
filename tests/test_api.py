@@ -22,6 +22,13 @@ def test_health_exposes_runtime_without_private_paths() -> None:
     assert isinstance(payload["ready"], bool)
     assert payload["device"] in {"CPU", "CUDA", "MPS"}
     assert not payload.get("checkpoint") or "/" not in payload["checkpoint"]
+    assert payload["postprocessing"] is None or set(payload["postprocessing"]) == {
+        "mask_threshold",
+        "peak_threshold",
+        "min_size",
+        "gaussian_sigma",
+        "peak_window_size",
+    }
     assert response.headers["cache-control"] == "no-store"
 
 

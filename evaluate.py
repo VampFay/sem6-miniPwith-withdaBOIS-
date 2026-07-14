@@ -11,9 +11,10 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from tqdm import tqdm
 
 from src.config import Config, select_device
-from src.inference import AttnDistInference
+from src.inference import AttnDistInference, PostprocessConfig
 from src.training.data import official_fold_split
 from src.utils.metrics import calculate_instance_metrics, calculate_metrics
 
@@ -43,6 +44,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", type=Path, default=Path("outputs_v2/evaluation"))
     parser.add_argument("--tta", action="store_true")
     parser.add_argument("--limit", type=int, help="Optional smoke-test limit")
+    parser.add_argument("--mask-threshold", type=float)
+    parser.add_argument("--peak-threshold", type=float)
+    parser.add_argument("--min-size", type=int)
+    parser.add_argument("--gaussian-sigma", type=float)
+    parser.add_argument("--peak-window-size", type=int)
     return parser.parse_args()
 
 
@@ -60,12 +66,35 @@ def main() -> None:
     if args.limit:
         test_ids = test_ids[: args.limit]
     engine = AttnDistInference.from_checkpoint(args.checkpoint, select_device())
+    postprocessing = PostprocessConfig(
+        mask_threshold=engine.postprocess.mask_threshold
+        if args.mask_threshold is None
+        else args.mask_threshold,
+        peak_threshold=engine.postprocess.peak_threshold
+        if args.peak_threshold is None
+        else args.peak_threshold,
+        min_size=engine.postprocess.min_size if args.min_size is None else args.min_size,
+        gaussian_sigma=engine.postprocess.gaussian_sigma
+        if args.gaussian_sigma is None
+        else args.gaussian_sigma,
+        peak_window_size=engine.postprocess.peak_window_size
+        if args.peak_window_size is None
+        else args.peak_window_size,
+    )
     rows: list[dict[str, float | int]] = []
-    for index in test_ids:
-        result = engine.predict_full(images[index], use_tta=args.tta)
+    for index in tqdm(test_ids, desc="test evaluation"):
+        result = engine.predict_full(
+            images[index],
+            use_tta=args.tta,
+            mask_threshold=postprocessing.mask_threshold,
+            peak_threshold=postprocessing.peak_threshold,
+            min_size=postprocessing.min_size,
+            gaussian_sigma=postprocessing.gaussian_sigma,
+            peak_window_size=postprocessing.peak_window_size,
+        )
         truth = instances[index]
         binary = (truth > 0).astype(np.uint8)
-        semantic = calculate_metrics(binary, result["mask"] >= config.threshold)
+        semantic = calculate_metrics(binary, result["mask"] >= postprocessing.mask_threshold)
         instance_metrics = calculate_instance_metrics(truth, result["instances"])
         rows.append({"index": int(index), **semantic, **asdict(instance_metrics)})
 
@@ -88,7 +117,7 @@ def main() -> None:
             "validation": config.validation_fold,
             "test": config.test_fold,
         },
-        "settings": {"tta": args.tta, "mask_threshold": config.threshold},
+        "settings": {"tta": args.tta, **postprocessing.as_dict()},
         "runtime": {
             "python": platform.python_version(),
             "torch": torch.__version__,

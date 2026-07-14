@@ -23,7 +23,7 @@ from fastapi.staticfiles import StaticFiles
 from PIL import Image, UnidentifiedImageError
 
 from src.config import select_device
-from src.inference import AttnDistInference
+from src.inference import AttnDistInference, PostprocessConfig
 from src.reporting import analysis_pdf, build_artifacts, measurements_csv
 
 LOGGER = logging.getLogger("attn_dist.api")
@@ -32,6 +32,7 @@ WEB_DIST = ROOT / "web" / "dist"
 MAX_UPLOAD_BYTES = int(os.getenv("ATTNDIST_MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
 MAX_IMAGE_PIXELS = int(os.getenv("ATTNDIST_MAX_IMAGE_PIXELS", str(2048 * 2048)))
 CHECKPOINT_CANDIDATES = (
+    Path("outputs_v2/checkpoints/best_iou_calibrated.pt"),
     Path("outputs_v2/checkpoints/best_iou.pt"),
     Path("outputs_v2/checkpoints/best_model.pth"),
 )
@@ -130,10 +131,11 @@ def runtime_status() -> dict[str, object]:
             "device": device,
             "checkpoint": None,
             "checkpoint_sha256": None,
+            "postprocessing": None,
             "detail": "No version-2 inference checkpoint is installed.",
         }
     try:
-        resolved, _ = active_engine()
+        resolved, engine = active_engine()
         modified_ns = resolved.stat().st_mtime_ns
         return {
             "status": "ready",
@@ -141,6 +143,7 @@ def runtime_status() -> dict[str, object]:
             "device": device,
             "checkpoint": resolved.name,
             "checkpoint_sha256": checkpoint_sha256(str(resolved), modified_ns),
+            "postprocessing": engine.postprocess.as_dict(),
             "detail": None,
         }
     except Exception:
@@ -151,6 +154,7 @@ def runtime_status() -> dict[str, object]:
             "device": device,
             "checkpoint": checkpoint.name,
             "checkpoint_sha256": None,
+            "postprocessing": None,
             "detail": "Checkpoint failed schema or model compatibility validation.",
         }
 
@@ -195,10 +199,10 @@ def ready() -> Response:
 def analyze(
     file: Annotated[UploadFile, File()],
     analysis_id: Annotated[str, Form(min_length=1, max_length=64, pattern=r".*\S.*")],
-    use_tta: Annotated[bool, Form()] = True,
-    mask_threshold: Annotated[float, Form(ge=0.1, le=0.9)] = 0.5,
-    peak_threshold: Annotated[float, Form(ge=0.1, le=0.9)] = 0.35,
-    min_size: Annotated[int, Form(ge=1, le=1000)] = 10,
+    use_tta: Annotated[bool, Form()] = False,
+    mask_threshold: Annotated[float | None, Form(ge=0.1, le=0.9)] = None,
+    peak_threshold: Annotated[float | None, Form(ge=0.1, le=0.9)] = None,
+    min_size: Annotated[int | None, Form(ge=1, le=1000)] = None,
 ) -> dict[str, object]:
     try:
         _, engine = active_engine()
@@ -227,13 +231,26 @@ def analyze(
             status_code=422, detail="Uploaded file is not a valid image."
         ) from error
 
+    settings = PostprocessConfig(
+        mask_threshold=engine.postprocess.mask_threshold
+        if mask_threshold is None
+        else mask_threshold,
+        peak_threshold=engine.postprocess.peak_threshold
+        if peak_threshold is None
+        else peak_threshold,
+        min_size=engine.postprocess.min_size if min_size is None else min_size,
+        gaussian_sigma=engine.postprocess.gaussian_sigma,
+        peak_window_size=engine.postprocess.peak_window_size,
+    )
     with INFERENCE_LOCK:
         result = engine.predict_full(
             image,
             use_tta=use_tta,
-            mask_threshold=mask_threshold,
-            peak_threshold=peak_threshold,
-            min_size=min_size,
+            mask_threshold=settings.mask_threshold,
+            peak_threshold=settings.peak_threshold,
+            min_size=settings.min_size,
+            gaussian_sigma=settings.gaussian_sigma,
+            peak_window_size=settings.peak_window_size,
         )
     artifacts = build_artifacts(image, result["instances"])
     count = len(artifacts.measurements)
@@ -243,6 +260,7 @@ def analyze(
     probability = (np.clip(result["mask"], 0, 1) * 255).astype(np.uint8)
     return {
         "analysis_id": analysis_id,
+        "settings": {"use_tta": use_tta, **settings.as_dict()},
         "metrics": {
             "nucleus_count": count,
             "mean_area_px": mean_area,

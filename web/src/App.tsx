@@ -116,7 +116,6 @@ export default function App() {
               sourceUrl={sourceUrl}
               caseId={request.caseId}
               fileName={request.file.name}
-              options={request.options}
               health={health}
               onReset={clearAnalysis}
             />

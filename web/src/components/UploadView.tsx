@@ -21,7 +21,7 @@ import {cn} from '../utils';
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/tiff']);
 const DEFAULT_OPTIONS: AnalysisOptions = {
-  useTta: true,
+  useTta: false,
   maskThreshold: 0.5,
   peakThreshold: 0.35,
   minSize: 10,
@@ -75,11 +75,29 @@ export function UploadView({health, healthError, analysisError, onAnalyze, onRef
   const [fileError, setFileError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const appliedCheckpoint = useRef<string | null>(null);
   const previewUrl = useMemo(() => file ? URL.createObjectURL(file) : null, [file]);
 
   useEffect(() => () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
   }, [previewUrl]);
+
+  useEffect(() => {
+    if (
+      health?.ready
+      && health.checkpoint_sha256
+      && health.postprocessing
+      && appliedCheckpoint.current !== health.checkpoint_sha256
+    ) {
+      setOptions((current) => ({
+        ...current,
+        maskThreshold: health.postprocessing!.mask_threshold,
+        peakThreshold: health.postprocessing!.peak_threshold,
+        minSize: health.postprocessing!.min_size,
+      }));
+      appliedCheckpoint.current = health.checkpoint_sha256;
+    }
+  }, [health]);
 
   const selectFile = (candidate: File | undefined) => {
     if (!candidate) return;

@@ -37,6 +37,10 @@ class Config:
     test_fold: int = 3
     num_workers: int = 0
     threshold: float = 0.5
+    peak_threshold: float = 0.35
+    min_instance_area: int = 10
+    distance_smoothing_sigma: float = 1.0
+    peak_window_size: int = 7
     gradient_clip: float = 1.0
     early_stopping_patience: int = 20
     data_dir: Path = field(

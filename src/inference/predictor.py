@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
@@ -15,23 +16,73 @@ from src.config import IMAGENET_MEAN, IMAGENET_STD
 from src.models.factory import build_model
 
 
+@dataclass(frozen=True)
+class PostprocessConfig:
+    mask_threshold: float = 0.5
+    peak_threshold: float = 0.35
+    min_size: int = 10
+    gaussian_sigma: float = 1.0
+    peak_window_size: int = 7
+
+    def __post_init__(self) -> None:
+        if not 0 < self.mask_threshold < 1 or not 0 < self.peak_threshold < 1:
+            raise ValueError("Mask and peak thresholds must be in the interval (0, 1)")
+        if self.min_size < 1:
+            raise ValueError("Minimum instance size must be positive")
+        if self.gaussian_sigma < 0:
+            raise ValueError("Gaussian sigma must be non-negative")
+        if self.peak_window_size < 1 or self.peak_window_size % 2 == 0:
+            raise ValueError("Peak window size must be a positive odd integer")
+
+    def as_dict(self) -> dict[str, float | int]:
+        return {
+            "mask_threshold": self.mask_threshold,
+            "peak_threshold": self.peak_threshold,
+            "min_size": self.min_size,
+            "gaussian_sigma": self.gaussian_sigma,
+            "peak_window_size": self.peak_window_size,
+        }
+
+
 def postprocess_instances(
     mask_probability: np.ndarray,
     distance_map: np.ndarray,
     mask_threshold: float = 0.5,
     peak_threshold: float = 0.35,
     min_size: int = 10,
+    gaussian_sigma: float = 1.0,
+    peak_window_size: int = 7,
 ) -> np.ndarray:
-    foreground = mask_probability >= mask_threshold
+    settings = PostprocessConfig(
+        mask_threshold,
+        peak_threshold,
+        min_size,
+        gaussian_sigma,
+        peak_window_size,
+    )
+    mask_probability = np.asarray(mask_probability)
+    distance_map = np.asarray(distance_map)
+    if (
+        mask_probability.ndim != 2
+        or distance_map.ndim != 2
+        or mask_probability.shape != distance_map.shape
+    ):
+        raise ValueError("Mask probability and distance map must be same-shaped 2D arrays")
+    if not np.isfinite(mask_probability).all() or not np.isfinite(distance_map).all():
+        raise ValueError("Postprocessing inputs must contain only finite values")
+
+    foreground = mask_probability >= settings.mask_threshold
     components, _ = label(foreground)
     component_sizes = np.bincount(components.ravel())
-    foreground = foreground & (component_sizes[components] >= min_size)
+    foreground = foreground & (component_sizes[components] >= settings.min_size)
     if not foreground.any():
         return np.zeros(foreground.shape, dtype=np.int32)
-    smooth_distance = gaussian_filter(distance_map.astype(np.float32), sigma=1.0)
+    smooth_distance = gaussian_filter(
+        distance_map.astype(np.float32), sigma=settings.gaussian_sigma
+    )
     peaks = (
-        (smooth_distance == maximum_filter(smooth_distance, size=7))
-        & (smooth_distance >= peak_threshold)
+        (smooth_distance == maximum_filter(smooth_distance, size=settings.peak_window_size))
+        & (smooth_distance >= settings.peak_threshold)
         & foreground
     )
     markers, marker_count = label(peaks)
@@ -48,6 +99,7 @@ class AttnDistInference:
         device: torch.device | str,
         tile_size: int = 256,
         overlap: int = 64,
+        postprocess: PostprocessConfig | None = None,
     ) -> None:
         if overlap < 0 or overlap >= tile_size:
             raise ValueError("Overlap must be non-negative and smaller than tile size")
@@ -55,6 +107,7 @@ class AttnDistInference:
         self.device = torch.device(device)
         self.tile_size = tile_size
         self.overlap = overlap
+        self.postprocess = postprocess or PostprocessConfig()
 
     @classmethod
     def from_checkpoint(
@@ -72,9 +125,35 @@ class AttnDistInference:
         saved_config = checkpoint["config"]
         model_name = str(saved_config.get("model_name", "attn-dist"))
         encoder_name = str(saved_config.get("encoder", encoder_name))
+        saved_postprocess = checkpoint.get("postprocessing", {})
+        postprocess = PostprocessConfig(
+            mask_threshold=float(
+                saved_postprocess.get("mask_threshold", saved_config.get("threshold", 0.5))
+            ),
+            peak_threshold=float(
+                saved_postprocess.get(
+                    "peak_threshold", saved_config.get("peak_threshold", 0.35)
+                )
+            ),
+            min_size=int(
+                saved_postprocess.get(
+                    "min_size", saved_config.get("min_instance_area", 10)
+                )
+            ),
+            gaussian_sigma=float(
+                saved_postprocess.get(
+                    "gaussian_sigma", saved_config.get("distance_smoothing_sigma", 1.0)
+                )
+            ),
+            peak_window_size=int(
+                saved_postprocess.get(
+                    "peak_window_size", saved_config.get("peak_window_size", 7)
+                )
+            ),
+        )
         model = build_model(model_name, encoder_name, encoder_weights=None)
         model.load_state_dict(checkpoint["model_state_dict"], strict=True)
-        return cls(model, device, **kwargs)
+        return cls(model, device, postprocess=postprocess, **kwargs)
 
     @staticmethod
     def _to_tensor(image: np.ndarray) -> torch.Tensor:
@@ -160,15 +239,46 @@ class AttnDistInference:
         self,
         image: np.ndarray,
         use_tta: bool = False,
-        mask_threshold: float = 0.5,
-        peak_threshold: float = 0.35,
-        min_size: int = 10,
+        mask_threshold: float | None = None,
+        peak_threshold: float | None = None,
+        min_size: int | None = None,
+        gaussian_sigma: float | None = None,
+        peak_window_size: int | None = None,
     ) -> dict[str, np.ndarray]:
-        mask, distance, uncertainty = self._predict_tiled(image, use_tta)
-        instances = postprocess_instances(mask, distance, mask_threshold, peak_threshold, min_size)
+        maps = self.predict_maps(image, use_tta)
+        mask = maps["mask"]
+        distance = maps["dist_map"]
+        settings = PostprocessConfig(
+            mask_threshold=self.postprocess.mask_threshold
+            if mask_threshold is None
+            else mask_threshold,
+            peak_threshold=self.postprocess.peak_threshold
+            if peak_threshold is None
+            else peak_threshold,
+            min_size=self.postprocess.min_size if min_size is None else min_size,
+            gaussian_sigma=self.postprocess.gaussian_sigma
+            if gaussian_sigma is None
+            else gaussian_sigma,
+            peak_window_size=self.postprocess.peak_window_size
+            if peak_window_size is None
+            else peak_window_size,
+        )
+        instances = postprocess_instances(
+            mask,
+            distance,
+            settings.mask_threshold,
+            settings.peak_threshold,
+            settings.min_size,
+            settings.gaussian_sigma,
+            settings.peak_window_size,
+        )
         return {
             "mask": mask,
             "dist_map": distance,
-            "uncertainty": uncertainty,
+            "uncertainty": maps["uncertainty"],
             "instances": instances,
         }
+
+    def predict_maps(self, image: np.ndarray, use_tta: bool = False) -> dict[str, np.ndarray]:
+        mask, distance, uncertainty = self._predict_tiled(image, use_tta)
+        return {"mask": mask, "dist_map": distance, "uncertainty": uncertainty}

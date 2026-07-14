@@ -17,6 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from src.config import Config
+from src.inference import PostprocessConfig
 from src.training.data import DataLoaders
 from src.utils.losses import AttnDistComboLoss
 from src.utils.metrics import calculate_metrics
@@ -145,6 +146,13 @@ class Trainer:
                     "dice": validation.dice,
                     "iou": validation.iou,
                 },
+                "postprocessing": PostprocessConfig(
+                    mask_threshold=self.config.threshold,
+                    peak_threshold=self.config.peak_threshold,
+                    min_size=self.config.min_instance_area,
+                    gaussian_sigma=self.config.distance_smoothing_sigma,
+                    peak_window_size=self.config.peak_window_size,
+                ).as_dict(),
                 "dataset": {
                     "manifest_sha256": manifest_sha256,
                     "train_fold": self.config.train_fold,

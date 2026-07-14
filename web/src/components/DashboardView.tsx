@@ -19,7 +19,7 @@ import {
   Target,
 } from 'lucide-react';
 import {useMemo, useState} from 'react';
-import type {AnalysisOptions, AnalysisResult, HealthStatus, ResultView} from '../types';
+import type {AnalysisResult, HealthStatus, ResultView} from '../types';
 import {cn} from '../utils';
 
 interface DashboardViewProps {
@@ -27,7 +27,6 @@ interface DashboardViewProps {
   sourceUrl: string;
   caseId: string;
   fileName: string;
-  options: AnalysisOptions;
   health: HealthStatus | null;
   onReset: () => void;
 }
@@ -62,7 +61,7 @@ function MetricBars({values, color}: {values: number[]; color: string}) {
   );
 }
 
-export function DashboardView({result, sourceUrl, caseId, fileName, options, health, onReset}: DashboardViewProps) {
+export function DashboardView({result, sourceUrl, caseId, fileName, health, onReset}: DashboardViewProps) {
   const [activeView, setActiveView] = useState<ResultView>('overlay');
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
@@ -104,10 +103,10 @@ export function DashboardView({result, sourceUrl, caseId, fileName, options, hea
           </section>
 
           <section className="mt-5 rounded-md border border-white/5 bg-black/20 p-3 font-mono text-[9px] text-zinc-500">
-            <div className="flex justify-between"><span>MASK THRESHOLD</span><strong className="text-zinc-300">{options.maskThreshold}</strong></div>
-            <div className="mt-2 flex justify-between"><span>PEAK THRESHOLD</span><strong className="text-zinc-300">{options.peakThreshold}</strong></div>
-            <div className="mt-2 flex justify-between"><span>MIN AREA</span><strong className="text-zinc-300">{options.minSize} px^2</strong></div>
-            <div className="mt-2 flex justify-between"><span>TTA</span><strong className="text-zinc-300">{options.useTta ? 'ON' : 'OFF'}</strong></div>
+            <div className="flex justify-between"><span>MASK THRESHOLD</span><strong className="text-zinc-300">{result.settings.mask_threshold}</strong></div>
+            <div className="mt-2 flex justify-between"><span>PEAK THRESHOLD</span><strong className="text-zinc-300">{result.settings.peak_threshold}</strong></div>
+            <div className="mt-2 flex justify-between"><span>MIN AREA</span><strong className="text-zinc-300">{result.settings.min_size} px^2</strong></div>
+            <div className="mt-2 flex justify-between"><span>TTA</span><strong className="text-zinc-300">{result.settings.use_tta ? 'ON' : 'OFF'}</strong></div>
           </section>
 
           <button className="mt-auto rounded border border-white/10 py-2 text-[10px] font-semibold uppercase text-zinc-500 hover:text-white" type="button" onClick={onReset}>Close analysis</button>

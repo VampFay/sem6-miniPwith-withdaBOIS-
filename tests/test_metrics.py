@@ -1,6 +1,65 @@
 import numpy as np
+import pytest
+from scipy.optimize import linear_sum_assignment
 
 from src.utils.metrics import calculate_aji, calculate_instance_metrics, calculate_metrics
+
+
+def brute_force_instance_scores(
+    truth: np.ndarray, prediction: np.ndarray, match_iou: float = 0.5
+) -> tuple[float, float, float, float, float]:
+    true_masks = [truth == value for value in np.unique(truth) if value > 0]
+    pred_masks = [prediction == value for value in np.unique(prediction) if value > 0]
+    if not true_masks and not pred_masks:
+        return 1.0, 1.0, 1.0, 1.0, 1.0
+    iou = np.zeros((len(true_masks), len(pred_masks)), dtype=np.float64)
+    intersections = np.zeros_like(iou)
+    unions = np.zeros_like(iou)
+    for row, true_mask in enumerate(true_masks):
+        for column, pred_mask in enumerate(pred_masks):
+            intersections[row, column] = np.logical_and(true_mask, pred_mask).sum()
+            unions[row, column] = np.logical_or(true_mask, pred_mask).sum()
+            if intersections[row, column]:
+                iou[row, column] = intersections[row, column] / unions[row, column]
+    rows, columns = linear_sum_assignment(-iou) if iou.size else ([], [])
+    aji_pairs = [
+        (row, column)
+        for row, column in zip(rows, columns, strict=True)
+        if iou[row, column] > 0
+    ]
+    matched_rows = {row for row, _ in aji_pairs}
+    matched_columns = {column for _, column in aji_pairs}
+    aji_intersection = sum(intersections[row, column] for row, column in aji_pairs)
+    aji_union = sum(unions[row, column] for row, column in aji_pairs)
+    aji_union += sum(mask.sum() for row, mask in enumerate(true_masks) if row not in matched_rows)
+    aji_union += sum(
+        mask.sum() for column, mask in enumerate(pred_masks) if column not in matched_columns
+    )
+    aji = float(aji_intersection / aji_union) if aji_union else 1.0
+
+    matches = [
+        iou[row, column]
+        for row, column in zip(rows, columns, strict=True)
+        if iou[row, column] >= match_iou
+    ]
+    true_positive = len(matches)
+    false_positive = len(pred_masks) - true_positive
+    false_negative = len(true_masks) - true_positive
+    denominator = true_positive + 0.5 * false_positive + 0.5 * false_negative
+    recognition_quality = true_positive / denominator if denominator else 1.0
+    segmentation_quality = float(np.mean(matches)) if matches else 0.0
+    detection_f1 = (
+        2 * true_positive / (2 * true_positive + false_positive + false_negative)
+        if 2 * true_positive + false_positive + false_negative
+        else 1.0
+    )
+    return (
+        aji,
+        segmentation_quality * recognition_quality,
+        detection_f1,
+        segmentation_quality,
+        recognition_quality,
+    )
 
 
 def test_empty_binary_masks_are_a_perfect_match() -> None:
@@ -31,3 +90,50 @@ def test_aji_penalizes_an_unmatched_prediction() -> None:
     prediction[1:4, 1:4] = 1
     prediction[6:9, 6:9] = 2
     assert calculate_aji(truth, prediction) == 0.5
+
+
+def test_instance_metrics_score_a_merged_pair() -> None:
+    truth = np.zeros((6, 8), dtype=np.int32)
+    prediction = np.zeros_like(truth)
+    truth[1:3, 1:3] = 7
+    truth[1:3, 3:5] = 42
+    prediction[1:3, 1:5] = 9000
+
+    result = calculate_instance_metrics(truth, prediction)
+
+    assert result.aji == pytest.approx(1 / 3)
+    assert result.detection_f1 == pytest.approx(2 / 3)
+    assert result.segmentation_quality == pytest.approx(0.5)
+    assert result.pq == pytest.approx(1 / 3)
+
+
+def test_instance_metrics_support_sparse_noncontiguous_ids() -> None:
+    truth = np.zeros((8, 8), dtype=np.int64)
+    prediction = np.zeros_like(truth)
+    truth[1:4, 1:4] = 1_000_000
+    prediction[1:4, 1:4] = 9_000_000
+
+    assert calculate_instance_metrics(truth, prediction).pq == 1.0
+
+
+def test_vectorized_instance_metrics_match_brute_force_reference() -> None:
+    generator = np.random.default_rng(42)
+    for _ in range(12):
+        truth = generator.integers(0, 5, size=(16, 18), dtype=np.int32) * 11
+        prediction = generator.integers(0, 6, size=(16, 18), dtype=np.int32) * 101
+        expected = brute_force_instance_scores(truth, prediction)
+        actual = calculate_instance_metrics(truth, prediction)
+        assert (
+            actual.aji,
+            actual.pq,
+            actual.detection_f1,
+            actual.segmentation_quality,
+            actual.recognition_quality,
+        ) == pytest.approx(expected)
+
+
+def test_instance_metrics_reject_invalid_inputs() -> None:
+    with pytest.raises(ValueError, match="identical shapes"):
+        calculate_instance_metrics(np.zeros((2, 2)), np.zeros((3, 3)))
+    with pytest.raises(ValueError, match="match_iou"):
+        calculate_instance_metrics(np.zeros((2, 2)), np.zeros((2, 2)), match_iou=0)

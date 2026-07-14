@@ -13,6 +13,13 @@ export interface HealthStatus {
   device: 'CPU' | 'CUDA' | 'MPS';
   checkpoint: string | null;
   checkpoint_sha256: string | null;
+  postprocessing: {
+    mask_threshold: number;
+    peak_threshold: number;
+    min_size: number;
+    gaussian_sigma: number;
+    peak_window_size: number;
+  } | null;
   detail: string | null;
 }
 
@@ -27,6 +34,14 @@ export interface NucleusMeasurement {
 
 export interface AnalysisResult {
   analysis_id: string;
+  settings: {
+    use_tta: boolean;
+    mask_threshold: number;
+    peak_threshold: number;
+    min_size: number;
+    gaussian_sigma: number;
+    peak_window_size: number;
+  };
   metrics: {
     nucleus_count: number;
     mean_area_px: number;

@@ -1,8 +1,9 @@
 import warnings
 
 import numpy as np
+import pytest
 
-from src.inference import AttnDistInference, postprocess_instances
+from src.inference import AttnDistInference, PostprocessConfig, postprocess_instances
 
 
 def test_postprocessing_separates_two_distance_peaks() -> None:
@@ -31,3 +32,20 @@ def test_tensor_conversion_accepts_read_only_memory_map_views() -> None:
         tensor = AttnDistInference._to_tensor(image)
 
     assert tensor.shape == (1, 3, 16, 16)
+
+
+def test_postprocess_configuration_rejects_invalid_values() -> None:
+    with pytest.raises(ValueError, match="positive odd"):
+        PostprocessConfig(peak_window_size=4)
+    with pytest.raises(ValueError, match="interval"):
+        PostprocessConfig(mask_threshold=1.0)
+
+
+def test_postprocessing_rejects_invalid_maps() -> None:
+    valid = np.zeros((8, 8), dtype=np.float32)
+    with pytest.raises(ValueError, match="same-shaped 2D"):
+        postprocess_instances(valid, np.zeros((7, 8), dtype=np.float32))
+    invalid = valid.copy()
+    invalid[0, 0] = np.nan
+    with pytest.raises(ValueError, match="finite"):
+        postprocess_instances(invalid, valid)
