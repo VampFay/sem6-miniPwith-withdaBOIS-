@@ -1,0 +1,11 @@
+{
+  "source": "MedOtter/PanNuke",
+  "revision": "8bfedc274e5df3c5afcf258e4d05a968b197e88f",
+  "license": "CC BY-NC-SA 4.0",
+  "fold_counts": {
+    "1": 2656,
+    "2": 2523,
+    "3": 2722
+  },
+  "distance_maps": true
+}

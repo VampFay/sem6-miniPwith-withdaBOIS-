@@ -1,0 +1,50 @@
+{
+  "format": "prepared-pannuke-v2",
+  "sample_count": 7901,
+  "fold_counts": {
+    "1": 2656,
+    "2": 2523,
+    "3": 2722
+  },
+  "arrays": [
+    {
+      "file": "images.npy",
+      "sha256": "07794ddb921f41388e3e21ac00e542c1a94a7bf6ea2b0fd2d3c19fb0587dd940",
+      "shape": [
+        7901,
+        256,
+        256,
+        3
+      ],
+      "dtype": "uint8"
+    },
+    {
+      "file": "instances.npy",
+      "sha256": "894b6b371168679c459160924697b2bc6d85220924714fea7aba8a899881054c",
+      "shape": [
+        7901,
+        256,
+        256
+      ],
+      "dtype": "uint16"
+    },
+    {
+      "file": "folds.npy",
+      "sha256": "460d970429f823129269f4b82e70feddcba9bd01abe87c9ad5fbea1d13d79881",
+      "shape": [
+        7901
+      ],
+      "dtype": "uint8"
+    },
+    {
+      "file": "distances.npy",
+      "sha256": "8d644f502be285370a44c32db52616a6c70b7e92de62573654d5e7306962e9c9",
+      "shape": [
+        7901,
+        256,
+        256
+      ],
+      "dtype": "float16"
+    }
+  ]
+}

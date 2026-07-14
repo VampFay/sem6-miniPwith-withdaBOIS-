@@ -1,6 +1,8 @@
+import warnings
+
 import numpy as np
 
-from src.inference import postprocess_instances
+from src.inference import AttnDistInference, postprocess_instances
 
 
 def test_postprocessing_separates_two_distance_peaks() -> None:
@@ -18,3 +20,14 @@ def test_postprocessing_separates_two_distance_peaks() -> None:
 def test_postprocessing_handles_empty_prediction() -> None:
     empty = np.zeros((32, 32), dtype=np.float32)
     assert np.count_nonzero(postprocess_instances(empty, empty)) == 0
+
+
+def test_tensor_conversion_accepts_read_only_memory_map_views() -> None:
+    image = np.zeros((16, 16, 3), dtype=np.uint8)
+    image.setflags(write=False)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        tensor = AttnDistInference._to_tensor(image)
+
+    assert tensor.shape == (1, 3, 16, 16)

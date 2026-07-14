@@ -82,7 +82,9 @@ class AttnDistInference:
             raise ValueError("Expected an RGB image with shape [H, W, 3]")
         if image.dtype != np.uint8:
             image = np.clip(image, 0, 255).astype(np.uint8)
-        tensor = TF.to_tensor(np.ascontiguousarray(image))
+        elif not image.flags.c_contiguous or not image.flags.writeable:
+            image = np.array(image, copy=True, order="C")
+        tensor = TF.to_tensor(image)
         return cast(
             torch.Tensor, TF.normalize(tensor, IMAGENET_MEAN, IMAGENET_STD).unsqueeze(0)
         )

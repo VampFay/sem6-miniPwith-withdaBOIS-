@@ -10,10 +10,25 @@ Aurora Sabu Rangan, and Alan Joseph.
 ## Status
 
 The application, training pipeline, evaluation protocol, and deployment image are implemented
-and tested. Dataset files and model checkpoints are deliberately excluded from Git. The UI
-remains read-only until a strict version-2 inference checkpoint passes compatibility validation.
+and tested. A complete baseline was trained on PanNuke fold 1, selected on fold 2, and evaluated
+on all 2,722 fold-3 patches. Dataset files and model checkpoints are deliberately excluded from
+Git. The UI remains read-only until a strict version-2 inference checkpoint passes compatibility
+validation.
 
-No benchmark value is claimed without a complete fold-3 evaluation artifact.
+## Reproduced Baseline
+
+| Dice | IoU | AJI | PQ | Detection F1 | Segmentation quality |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 0.8248 | 0.7181 | 0.4811 | 0.3971 | 0.5178 | 0.7365 |
+
+These are binary, per-image means from one held-out fold using the epoch-53 checkpoint without
+test-time augmentation. They are not directly comparable to three-fold, tissue-averaged bPQ/mPQ
+results from multiclass systems. Exact hashes, confidence intervals, training history, and
+per-image evidence are in [docs/BASELINE.md](docs/BASELINE.md).
+
+The measured bottleneck is instance recognition and separation rather than the shape quality of
+matched nuclei. The staged, competitor-aligned response is documented in
+[docs/MODEL_ROADMAP.md](docs/MODEL_ROADMAP.md).
 
 ## Architecture
 
@@ -84,11 +99,12 @@ The evaluation summary records checkpoint SHA-256, fold protocol, runtime, setti
 metric distributions, and deterministic 95% bootstrap confidence intervals. `--limit` creates a
 smoke-test artifact and is never a benchmark result.
 
-Publish a value only with the Git commit, dataset manifest, complete training log, checkpoint
-hash, full `summary.json`, `per_image.csv`, and hardware/runtime record. Semantic IoU must never be
+Publish a value only with the Git commit, dataset manifest, training history, checkpoint hash,
+full `summary.json`, `per_image.csv`, and hardware/runtime record. Semantic IoU must never be
 renamed as AJI.
 
-Method details are in [docs/METHODOLOGY.md](docs/METHODOLOGY.md).
+Method details are in [docs/METHODOLOGY.md](docs/METHODOLOGY.md). The current baseline must remain
+fixed while new choices are developed on fold 2; fold 3 is not an iterative tuning set.
 
 ## Deployment
 
