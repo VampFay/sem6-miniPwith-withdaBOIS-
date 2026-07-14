@@ -133,6 +133,11 @@ This phase is cheap and directly targets recognition quality.
 
 Exit gate: statistically meaningful validation-PQ gain without retraining, plus a failure report.
 
+E01 completed on the frozen baseline checkpoint. Fold-2 PQ improved from 0.40436 to 0.60285
+without changing model weights, while Dice changed by -0.00065. The selected configuration,
+search boundaries, and leakage checks are recorded in [POSTPROCESSING.md](POSTPROCESSING.md).
+E02 is next; fold 3 remains quarantined.
+
 ## Phase 2: Fix the Instance Representation
 
 The current scalar distance target is insufficiently directional for touching clusters, and its
@@ -288,7 +293,7 @@ Exit gate: both modes pass deterministic API/UI workflows and publish quality-sp
 | ID | Change | Cost | Primary gate |
 | --- | --- | ---: | --- |
 | E00 | Lock and profile current baseline | low | reproducibility complete |
-| E01 | Fold-2 postprocessing sweep | low | PQ gain >= 0.02 |
+| E01 | Fold-2 postprocessing sweep | low | complete: PQ +0.19849; gate passed |
 | E02 | TTA and overlap ablation | low | gain/latency Pareto improvement |
 | E03 | Foreground-masked bounded distance loss | medium | PQ and detection F1 improve |
 | E04 | Boundary head | medium | merge errors decrease |

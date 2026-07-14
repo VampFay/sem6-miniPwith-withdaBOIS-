@@ -13,7 +13,8 @@ The application, training pipeline, evaluation protocol, and deployment image ar
 and tested. A complete baseline was trained on PanNuke fold 1, selected on fold 2, and evaluated
 on all 2,722 fold-3 patches. Dataset files and model checkpoints are deliberately excluded from
 Git. The UI remains read-only until a strict version-2 inference checkpoint passes compatibility
-validation.
+validation. Runtime discovery prefers a fold-2-calibrated checkpoint when one is available and
+retains the original checkpoint as the immutable reproduced baseline.
 
 ## Reproduced Baseline
 
@@ -29,6 +30,11 @@ per-image evidence are in [docs/BASELINE.md](docs/BASELINE.md).
 The measured bottleneck is instance recognition and separation rather than the shape quality of
 matched nuclei. The staged, competitor-aligned response is documented in
 [docs/MODEL_ROADMAP.md](docs/MODEL_ROADMAP.md).
+
+Fold-2-only postprocessing calibration raised validation PQ from 0.40436 to 0.60285 without
+changing model weights. This is development evidence, not a replacement for the held-out fold-3
+baseline. Search boundaries, leakage controls, and the calibrated artifact hash are in
+[docs/POSTPROCESSING.md](docs/POSTPROCESSING.md).
 
 ## Architecture
 
@@ -66,6 +72,8 @@ checkpoint readiness. Other commands:
 ./setup.sh prepare-data
 ./setup.sh train --epochs 150 --batch-size 8
 ./setup.sh evaluate
+./setup.sh tune outputs_v2/checkpoints/best_iou.pt \
+  --calibrated-checkpoint outputs_v2/checkpoints/best_iou_calibrated.pt
 ```
 
 ## Data
@@ -93,7 +101,7 @@ review the license before distributing a checkpoint.
 2. Run `./setup.sh prepare-data` and `./setup.sh validate`.
 3. Train on fold 1 with `./setup.sh train --epochs 150 --batch-size 8 --seed 42`.
 4. Select `best_iou.pt` using fold 2 only.
-5. Run `./setup.sh evaluate outputs_v2/checkpoints/best_iou.pt --tta` on fold 3 once.
+5. Run `./setup.sh evaluate outputs_v2/checkpoints/best_iou.pt` on fold 3 once.
 
 The evaluation summary records checkpoint SHA-256, fold protocol, runtime, settings, sample count,
 metric distributions, and deterministic 95% bootstrap confidence intervals. `--limit` creates a
@@ -115,7 +123,7 @@ refuses readiness unless the mounted checkpoint has the expected schema and exac
 docker build -t attn-dist-net .
 docker run --rm -p 8000:8000 \
   --read-only --tmpfs /tmp:size=256m \
-  -v "$PWD/outputs_v2/checkpoints/best_iou.pt:/models/best_iou.pt:ro" \
+  -v "$PWD/outputs_v2/checkpoints/best_iou_calibrated.pt:/models/best_iou.pt:ro" \
   attn-dist-net
 ```
 

@@ -41,7 +41,9 @@ distance, and uncertainty outputs. Optional four-view test-time augmentation ave
 and vertical reflections; mask standard deviation is reported as uncertainty.
 
 Foreground thresholding and minimum-area filtering precede peak detection. Marker-controlled
-watershed on the negative distance map produces the final instance labels.
+watershed on the negative distance map produces the final instance labels. Model-specific
+postprocessing values are selected on fold 2 and embedded in the deployable checkpoint. The E01
+protocol and evidence are in [POSTPROCESSING.md](POSTPROCESSING.md).
 
 ## Evaluation
 
