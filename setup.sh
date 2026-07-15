@@ -288,7 +288,8 @@ start_training_background() {
       -l "$TRAIN_LAUNCH_LABEL" \
       -o "$TRAIN_LOG_FILE" \
       -e "$TRAIN_LOG_FILE" \
-      -- "$ROOT/setup.sh" train "${@:2}"
+      -- /bin/bash -c 'cd "$1"; shift; exec "$@"' \
+      attndist-training "$ROOT" "$PYTHON" "$ROOT/train.py" "${@:2}"
     for ((attempt = 0; attempt < 20; attempt++)); do
       pid="$(launchctl_training_pid || true)"
       [[ "$pid" =~ ^[0-9]+$ ]] && break
