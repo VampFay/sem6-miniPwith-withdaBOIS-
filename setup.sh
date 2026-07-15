@@ -344,7 +344,7 @@ training_status() {
   fi
   if [[ -f "$TRAIN_LOG_FILE" ]]; then
     info "Recent training output from $TRAIN_LOG_FILE"
-    tail -n 12 "$TRAIN_LOG_FILE"
+    tr '\r' '\n' <"$TRAIN_LOG_FILE" | tail -n 12
   fi
 }
 
