@@ -195,13 +195,19 @@ class AttnDistInference:
                     ),
                 ]
             )
+        augmented = torch.cat([forward(tensor) for forward, _ in transforms], dim=0)
+        output = self.model(augmented)
+        mask_probabilities = torch.sigmoid(output.mask_logits)
         masks, distances = [], []
-        for forward, inverse in transforms:
-            output = self.model(forward(tensor))
+        for index, (_, inverse) in enumerate(transforms):
             masks.append(
-                inverse(torch.sigmoid(output.mask_logits))[0, 0, :height, :width].cpu().numpy()
+                inverse(mask_probabilities[index : index + 1])[0, 0, :height, :width]
+                .cpu()
+                .numpy()
             )
-            distance = inverse(output.distance)[0, 0, :height, :width].cpu().numpy()
+            distance = (
+                inverse(output.distance[index : index + 1])[0, 0, :height, :width].cpu().numpy()
+            )
             distances.append(np.clip(distance, 0.0, 1.0))
         mask_stack = np.stack(masks)
         return mask_stack.mean(0), np.stack(distances).mean(0), mask_stack.std(0)
