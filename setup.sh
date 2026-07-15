@@ -9,7 +9,11 @@ STAMP_FILE="$VENV_DIR/.attndist-install-stamp"
 UI_DIR="$ROOT/web"
 UI_STAMP_FILE="$UI_DIR/.attndist-install-stamp"
 TRAIN_PID_FILE="$ROOT/outputs_v2/training.pid"
-TRAIN_LOG_FILE="${ATTNDIST_TRAIN_LOG:-$ROOT/outputs_v2/training.log}"
+DEFAULT_TRAIN_LOG="$ROOT/outputs_v2/training.log"
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  DEFAULT_TRAIN_LOG="/tmp/attndist-training.log"
+fi
+TRAIN_LOG_FILE="${ATTNDIST_TRAIN_LOG:-$DEFAULT_TRAIN_LOG}"
 TRAIN_LAUNCH_LABEL="com.attndist.training"
 PYTHON=""
 
