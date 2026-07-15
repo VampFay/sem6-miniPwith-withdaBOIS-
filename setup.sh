@@ -10,6 +10,7 @@ UI_DIR="$ROOT/web"
 UI_STAMP_FILE="$UI_DIR/.attndist-install-stamp"
 TRAIN_PID_FILE="$ROOT/outputs_v2/training.pid"
 TRAIN_LOG_FILE="${ATTNDIST_TRAIN_LOG:-$ROOT/outputs_v2/training.log}"
+TRAIN_LAUNCH_LABEL="com.attndist.training"
 PYTHON=""
 
 info() {
@@ -258,16 +259,22 @@ train_model() {
 }
 
 training_is_running() {
-  local pid
+  local pid command
   [[ -f "$TRAIN_PID_FILE" ]] || return 1
   pid="$(cat "$TRAIN_PID_FILE")"
   [[ "$pid" =~ ^[0-9]+$ ]] || return 1
   kill -0 "$pid" >/dev/null 2>&1 || return 1
-  ps -p "$pid" -o command= | grep -F "$ROOT/train.py" >/dev/null 2>&1
+  command="$(ps -p "$pid" -o command=)"
+  [[ "$command" == *"$ROOT/train.py"* || "$command" == *"$ROOT/setup.sh train"* ]]
+}
+
+launchctl_training_pid() {
+  launchctl print "gui/$(id -u)/$TRAIN_LAUNCH_LABEL" 2>/dev/null \
+    | awk '$1 == "pid" && $2 == "=" {print $3; exit}'
 }
 
 start_training_background() {
-  local pid
+  local pid="" attempt
   ensure_environment
   has_dataset || die "Training requires prepared PanNuke arrays in data/pannuke"
   if training_is_running; then
@@ -275,12 +282,28 @@ start_training_background() {
   fi
   mkdir -p "$(dirname "$TRAIN_PID_FILE")" "$(dirname "$TRAIN_LOG_FILE")"
   info "Starting background training; log: $TRAIN_LOG_FILE"
-  (
-    cd "$ROOT"
-    nohup "$PYTHON" "$ROOT/train.py" "${@:2}" >>"$TRAIN_LOG_FILE" 2>&1 &
-    printf '%s\n' "$!" >"$TRAIN_PID_FILE"
-  )
-  pid="$(cat "$TRAIN_PID_FILE")"
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    launchctl remove "$TRAIN_LAUNCH_LABEL" >/dev/null 2>&1 || true
+    launchctl submit \
+      -l "$TRAIN_LAUNCH_LABEL" \
+      -o "$TRAIN_LOG_FILE" \
+      -e "$TRAIN_LOG_FILE" \
+      -- "$ROOT/setup.sh" train "${@:2}"
+    for ((attempt = 0; attempt < 20; attempt++)); do
+      pid="$(launchctl_training_pid || true)"
+      [[ "$pid" =~ ^[0-9]+$ ]] && break
+      sleep 0.25
+    done
+    [[ "$pid" =~ ^[0-9]+$ ]] || die "launchctl did not report a training PID"
+    printf '%s\n' "$pid" >"$TRAIN_PID_FILE"
+  else
+    (
+      cd "$ROOT"
+      nohup "$PYTHON" "$ROOT/train.py" "${@:2}" >>"$TRAIN_LOG_FILE" 2>&1 &
+      printf '%s\n' "$!" >"$TRAIN_PID_FILE"
+    )
+    pid="$(cat "$TRAIN_PID_FILE")"
+  fi
   sleep 1
   training_is_running || die "Training failed to start; inspect $TRAIN_LOG_FILE"
   info "Training started with PID $pid"
