@@ -16,6 +16,7 @@ fi
 TRAIN_LOG_FILE="${ATTNDIST_TRAIN_LOG:-$DEFAULT_TRAIN_LOG}"
 TRAIN_LAUNCH_LABEL="com.attndist.training"
 PYTHON=""
+TRAIN_PYTHON=""
 
 info() {
   printf '[attn-dist] %s\n' "$*"
@@ -272,6 +273,22 @@ training_is_running() {
   [[ "$command" == *"$ROOT/train.py"* || "$command" == *"$ROOT/setup.sh train"* ]]
 }
 
+select_training_python() {
+  local launch_venv current_stamp saved_stamp
+  TRAIN_PYTHON="$PYTHON"
+  if [[ "$(uname -s)" != "Darwin" || "$PYTHON" != "$HOME/Desktop/"* ]]; then
+    return
+  fi
+  launch_venv="${ATTNDIST_LAUNCH_VENV_DIR:-/private/tmp/attndist-training-venv}"
+  current_stamp="$(cksum "$ROOT/pyproject.toml")"
+  saved_stamp="$(cat "$launch_venv/.attndist-install-stamp" 2>/dev/null || true)"
+  if [[ ! -x "$launch_venv/bin/python" || "$saved_stamp" != "$current_stamp" ]]; then
+    info "Preparing macOS background runtime outside Desktop privacy controls"
+    ATTNDIST_VENV_DIR="$launch_venv" "$ROOT/setup.sh" setup
+  fi
+  TRAIN_PYTHON="$launch_venv/bin/python"
+}
+
 launchctl_training_pid() {
   launchctl print "gui/$(id -u)/$TRAIN_LAUNCH_LABEL" 2>/dev/null \
     | awk '$1 == "pid" && $2 == "=" {print $3; exit}'
@@ -281,6 +298,7 @@ start_training_background() {
   local pid="" attempt
   ensure_environment
   has_dataset || die "Training requires prepared PanNuke arrays in data/pannuke"
+  select_training_python
   if training_is_running; then
     die "Training is already running with PID $(cat "$TRAIN_PID_FILE")"
   fi
@@ -292,8 +310,9 @@ start_training_background() {
       -l "$TRAIN_LAUNCH_LABEL" \
       -o "$TRAIN_LOG_FILE" \
       -e "$TRAIN_LOG_FILE" \
-      -- /bin/bash -c 'cd "$1"; shift; exec "$@"' \
-      attndist-training "$ROOT" "$PYTHON" "$ROOT/train.py" "${@:2}"
+      -- /bin/bash -c \
+      'cd "$1"; label="$2"; shift 2; "$@"; status=$?; /bin/launchctl remove "$label"; exit "$status"' \
+      attndist-training "$ROOT" "$TRAIN_LAUNCH_LABEL" "$TRAIN_PYTHON" "$ROOT/train.py" "${@:2}"
     for ((attempt = 0; attempt < 20; attempt++)); do
       pid="$(launchctl_training_pid || true)"
       [[ "$pid" =~ ^[0-9]+$ ]] && break
@@ -304,7 +323,7 @@ start_training_background() {
   else
     (
       cd "$ROOT"
-      nohup "$PYTHON" "$ROOT/train.py" "${@:2}" >>"$TRAIN_LOG_FILE" 2>&1 &
+      nohup "$TRAIN_PYTHON" "$ROOT/train.py" "${@:2}" >>"$TRAIN_LOG_FILE" 2>&1 &
       printf '%s\n' "$!" >"$TRAIN_PID_FILE"
     )
     pid="$(cat "$TRAIN_PID_FILE")"
