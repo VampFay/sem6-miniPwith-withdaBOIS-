@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
+from typing import Literal, cast
 
 import numpy as np
 import torch
@@ -100,14 +100,18 @@ class AttnDistInference:
         tile_size: int = 256,
         overlap: int = 64,
         postprocess: PostprocessConfig | None = None,
+        distance_activation: Literal["identity", "sigmoid"] = "identity",
     ) -> None:
         if overlap < 0 or overlap >= tile_size:
             raise ValueError("Overlap must be non-negative and smaller than tile size")
+        if distance_activation not in {"identity", "sigmoid"}:
+            raise ValueError(f"Unsupported distance activation: {distance_activation}")
         self.model = model.to(device).eval()
         self.device = torch.device(device)
         self.tile_size = tile_size
         self.overlap = overlap
         self.postprocess = postprocess or PostprocessConfig()
+        self.distance_activation = distance_activation
 
     @classmethod
     def from_checkpoint(
@@ -123,6 +127,7 @@ class AttnDistInference:
         if checkpoint.get("artifact_type") != "attn-dist-inference":
             raise ValueError("Checkpoint is not a deployable Attn-Dist-Net inference artifact")
         saved_config = checkpoint["config"]
+        model_contract = checkpoint.get("model_contract", {})
         model_name = str(saved_config.get("model_name", "attn-dist"))
         encoder_name = str(saved_config.get("encoder", encoder_name))
         saved_postprocess = checkpoint.get("postprocessing", {})
@@ -153,7 +158,21 @@ class AttnDistInference:
         )
         model = build_model(model_name, encoder_name, encoder_weights=None)
         model.load_state_dict(checkpoint["model_state_dict"], strict=True)
-        return cls(model, device, postprocess=postprocess, **kwargs)
+        distance_activation = str(
+            model_contract.get(
+                "distance_activation",
+                saved_config.get("distance_activation", "identity"),
+            )
+        )
+        if distance_activation not in {"identity", "sigmoid"}:
+            raise ValueError(f"Unsupported distance activation: {distance_activation}")
+        return cls(
+            model,
+            device,
+            postprocess=postprocess,
+            distance_activation=cast(Literal["identity", "sigmoid"], distance_activation),
+            **kwargs,
+        )
 
     @staticmethod
     def _to_tensor(image: np.ndarray) -> torch.Tensor:
@@ -198,6 +217,11 @@ class AttnDistInference:
         augmented = torch.cat([forward(tensor) for forward, _ in transforms], dim=0)
         output = self.model(augmented)
         mask_probabilities = torch.sigmoid(output.mask_logits)
+        distance_predictions = (
+            torch.sigmoid(output.distance)
+            if self.distance_activation == "sigmoid"
+            else output.distance
+        )
         masks, distances = [], []
         for index, (_, inverse) in enumerate(transforms):
             masks.append(
@@ -206,7 +230,9 @@ class AttnDistInference:
                 .numpy()
             )
             distance = (
-                inverse(output.distance[index : index + 1])[0, 0, :height, :width].cpu().numpy()
+                inverse(distance_predictions[index : index + 1])[0, 0, :height, :width]
+                .cpu()
+                .numpy()
             )
             distances.append(np.clip(distance, 0.0, 1.0))
         mask_stack = np.stack(masks)

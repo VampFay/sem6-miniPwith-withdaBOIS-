@@ -4,7 +4,7 @@ import os
 import random
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 import torch
@@ -43,6 +43,11 @@ class Config:
     peak_window_size: int = 7
     gradient_clip: float = 1.0
     early_stopping_patience: int = 20
+    mask_loss_weight: float = 1.0
+    distance_loss_weight: float = 0.5
+    auxiliary_loss_weight: float = 0.2
+    distance_activation: Literal["identity", "sigmoid"] = "sigmoid"
+    distance_background_weight: float = 0.1
     data_dir: Path = field(
         default_factory=lambda: Path(os.getenv("ATTNDIST_DATA_DIR", "data/pannuke"))
     )
@@ -50,6 +55,21 @@ class Config:
         default_factory=lambda: Path(os.getenv("ATTNDIST_OUTPUT_DIR", "outputs_v2"))
     )
     device: torch.device = field(default_factory=select_device)
+
+    def __post_init__(self) -> None:
+        if self.epochs < 1 or self.batch_size < 1:
+            raise ValueError("Epochs and batch size must be positive")
+        if self.learning_rate <= 0 or self.weight_decay < 0:
+            raise ValueError("Learning rate must be positive and weight decay non-negative")
+        if self.early_stopping_patience < 0:
+            raise ValueError("Early-stopping patience must be non-negative")
+        if min(
+            self.mask_loss_weight,
+            self.distance_loss_weight,
+            self.auxiliary_loss_weight,
+            self.distance_background_weight,
+        ) < 0:
+            raise ValueError("Loss weights must be non-negative")
 
     @property
     def checkpoint_dir(self) -> Path:

@@ -29,16 +29,22 @@ pixelwise maximum to form the distance target.
 
 An ImageNet-initialized EfficientNet-B0 encoder supplies five feature scales. Four decoder stages
 use skip attention before convolutional fusion. The foreground head predicts logits; the distance
-head regresses normalized intra-nucleus distance. Deep-supervision heads regularize training.
+head predicts sigmoid-bounded normalized intra-nucleus distance. Deep-supervision heads regularize
+training.
 
-The objective combines Dice loss and binary cross-entropy for foreground segmentation, mean
-squared error for distance regression, and weighted deep supervision.
+The objective combines Dice loss and binary cross-entropy for foreground segmentation,
+foreground-normalized Smooth L1 distance regression, a separately normalized background-leakage
+penalty, and weighted deep supervision. The foreground and background terms are normalized
+independently so large background regions cannot dominate the distance task. Every component is
+recorded in CSV and TensorBoard logs.
 
 ## Inference
 
 Large images are processed in overlapping 256-pixel tiles. Hann-window weights blend foreground,
 distance, and uncertainty outputs. Optional four-view test-time augmentation averages horizontal
-and vertical reflections; mask standard deviation is reported as uncertainty.
+and vertical reflections in one batched model call; mask standard deviation is reported as
+uncertainty. Checkpoints declare the distance activation used during training. Version-2
+checkpoints without this field retain legacy identity semantics.
 
 Foreground thresholding and minimum-area filtering precede peak detection. Marker-controlled
 watershed on the negative distance map produces the final instance labels. Model-specific

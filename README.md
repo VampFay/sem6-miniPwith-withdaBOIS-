@@ -70,7 +70,11 @@ checkpoint readiness. Other commands:
 ./setup.sh doctor
 ./setup.sh check
 ./setup.sh prepare-data
-./setup.sh train --epochs 150 --batch-size 8
+./setup.sh train --epochs 150 --batch-size 8 \
+  --early-stopping-patience 0 --output-dir outputs_v2/e03_bounded_distance
+./setup.sh train-bg --epochs 150 --batch-size 8 \
+  --early-stopping-patience 0 --output-dir outputs_v2/e03_bounded_distance
+./setup.sh training-status
 ./setup.sh evaluate
 ./setup.sh tune outputs_v2/checkpoints/best_iou.pt \
   --calibrated-checkpoint outputs_v2/checkpoints/best_iou_calibrated.pt

@@ -145,10 +145,15 @@ MSE includes background pixels that can dominate the loss.
 
 ### 2.1 Correct the distance objective
 
-- Constrain the distance output to [0, 1] with a defined activation or calibrated loss domain.
-- Compute distance loss primarily inside nuclei and separately penalize foreground leakage.
-- Compare MSE, Smooth L1, and scale-balanced foreground/background losses.
-- Log every loss component so weighting failures are visible.
+- [x] Constrain the distance output to [0, 1] with an explicit checkpointed sigmoid activation.
+- [x] Compute Smooth L1 distance loss inside nuclei and separately penalize background leakage.
+- [x] Normalize foreground and background independently to prevent area imbalance.
+- [x] Log every train and validation loss component to CSV and TensorBoard.
+- [ ] Compare the bounded objective with the frozen MSE baseline across three seeds.
+
+E03 uses a background-leakage weight of 0.1 and retains the existing outer distance-task weight of
+0.5. These are declared in checkpoint configuration rather than hidden in code. Promotion still
+depends on fold-2 PQ and detection F1; implementation completion is not evidence of improvement.
 
 ### 2.2 Add separation-aware targets
 

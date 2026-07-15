@@ -18,6 +18,7 @@ def test_resume_loads_checkpoint_on_cpu(monkeypatch) -> None:
         "scheduler_state_dict": {},
         "scaler_state_dict": {},
         "best_iou": 0.75,
+        "stale_epochs": 2,
         "torch_rng_state": torch.get_rng_state(),
         "numpy_rng_state": np.random.get_state(),
     }
@@ -36,3 +37,4 @@ def test_resume_loads_checkpoint_on_cpu(monkeypatch) -> None:
     load.assert_called_once_with(Path("last_model.pt"), map_location="cpu", weights_only=False)
     assert trainer.start_epoch == 4
     assert trainer.best_iou == 0.75
+    assert trainer.stale_epochs == 2

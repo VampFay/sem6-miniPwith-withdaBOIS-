@@ -8,6 +8,8 @@ export MPLCONFIGDIR="${MPLCONFIGDIR:-$VENV_DIR/.matplotlib}"
 STAMP_FILE="$VENV_DIR/.attndist-install-stamp"
 UI_DIR="$ROOT/web"
 UI_STAMP_FILE="$UI_DIR/.attndist-install-stamp"
+TRAIN_PID_FILE="$ROOT/outputs_v2/training.pid"
+TRAIN_LOG_FILE="${ATTNDIST_TRAIN_LOG:-$ROOT/outputs_v2/training.log}"
 PYTHON=""
 
 info() {
@@ -124,12 +126,36 @@ find_checkpoint() {
     "$ROOT/outputs_v2/checkpoints/best_iou_calibrated.pt" \
     "$ROOT/outputs_v2/checkpoints/best_iou.pt" \
     "$ROOT/outputs_v2/checkpoints/best_model.pth"; do
+    if [[ -f "$candidate" ]] && checkpoint_is_valid "$candidate"; then
+      printf '%s\n' "$candidate"
+      return
+    fi
+  done
+  return 1
+}
+
+find_existing_checkpoint() {
+  local candidate
+  for candidate in \
+    "$ROOT/outputs_v2/checkpoints/best_iou_calibrated.pt" \
+    "$ROOT/outputs_v2/checkpoints/best_iou.pt" \
+    "$ROOT/outputs_v2/checkpoints/best_model.pth"; do
     if [[ -f "$candidate" ]]; then
       printf '%s\n' "$candidate"
       return
     fi
   done
   return 1
+}
+
+checkpoint_is_valid() {
+  local checkpoint="$1"
+  (
+    cd "$ROOT"
+    "$PYTHON" -c \
+      'import sys; from src.inference import AttnDistInference; AttnDistInference.from_checkpoint(sys.argv[1], "cpu")' \
+      "$checkpoint"
+  ) >/dev/null 2>&1
 }
 
 doctor() {
@@ -149,7 +175,9 @@ doctor() {
     warn "Prepared PanNuke arrays are absent; training and evaluation are unavailable"
   fi
   if checkpoint="$(find_checkpoint)"; then
-    info "Checkpoint found: $checkpoint"
+    info "Deployable checkpoint validated: $checkpoint"
+  elif checkpoint="$(find_existing_checkpoint)"; then
+    warn "Checkpoint exists but is incompatible with the deployable model contract: $checkpoint"
   else
     warn "No model checkpoint found; the app will open but analysis requires a checkpoint"
   fi
@@ -229,6 +257,50 @@ train_model() {
   exec "$PYTHON" "$ROOT/train.py" "${@:2}"
 }
 
+training_is_running() {
+  local pid
+  [[ -f "$TRAIN_PID_FILE" ]] || return 1
+  pid="$(cat "$TRAIN_PID_FILE")"
+  [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+  kill -0 "$pid" >/dev/null 2>&1 || return 1
+  ps -p "$pid" -o command= | grep -F "$ROOT/train.py" >/dev/null 2>&1
+}
+
+start_training_background() {
+  local pid
+  ensure_environment
+  has_dataset || die "Training requires prepared PanNuke arrays in data/pannuke"
+  if training_is_running; then
+    die "Training is already running with PID $(cat "$TRAIN_PID_FILE")"
+  fi
+  mkdir -p "$(dirname "$TRAIN_PID_FILE")" "$(dirname "$TRAIN_LOG_FILE")"
+  info "Starting background training; log: $TRAIN_LOG_FILE"
+  (
+    cd "$ROOT"
+    nohup "$PYTHON" "$ROOT/train.py" "${@:2}" >>"$TRAIN_LOG_FILE" 2>&1 &
+    printf '%s\n' "$!" >"$TRAIN_PID_FILE"
+  )
+  pid="$(cat "$TRAIN_PID_FILE")"
+  sleep 1
+  training_is_running || die "Training failed to start; inspect $TRAIN_LOG_FILE"
+  info "Training started with PID $pid"
+}
+
+training_status() {
+  local pid elapsed
+  if training_is_running; then
+    pid="$(cat "$TRAIN_PID_FILE")"
+    elapsed="$(ps -p "$pid" -o etime= | tr -d ' ')"
+    info "Training is running: pid=$pid elapsed=$elapsed"
+  else
+    info "No training process is running"
+  fi
+  if [[ -f "$TRAIN_LOG_FILE" ]]; then
+    info "Recent training output from $TRAIN_LOG_FILE"
+    tail -n 12 "$TRAIN_LOG_FILE"
+  fi
+}
+
 evaluate_model() {
   local checkpoint="${2:-}"
   ensure_environment
@@ -263,6 +335,8 @@ Commands:
   validate              Validate and hash prepared PanNuke arrays
   prepare-data [...]    Stream and prepare the pinned PanNuke release
   train [options]       Run train.py with the supplied options
+  train-bg [options]    Start one guarded training run in the background
+  training-status       Show background training state and recent output
   evaluate [path] [...] Evaluate a checkpoint, auto-discovering it when omitted
   tune [path] [...]     Tune postprocessing on validation fold 2 only
   all                   Run checks, validate data when present, then start the app
@@ -286,6 +360,8 @@ case "$command" in
   validate) validate_data ;;
   prepare-data) prepare_data "$@" ;;
   train) train_model "$@" ;;
+  train-bg) start_training_background "$@" ;;
+  training-status) training_status ;;
   evaluate) evaluate_model "$@" ;;
   tune) tune_postprocessing "$@" ;;
   all)

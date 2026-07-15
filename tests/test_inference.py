@@ -1,4 +1,6 @@
 import warnings
+from pathlib import Path
+from typing import Literal
 
 import numpy as np
 import pytest
@@ -6,6 +8,7 @@ import torch
 from torch import nn
 
 from src.inference import AttnDistInference, PostprocessConfig, postprocess_instances
+from src.inference import predictor as predictor_module
 from src.models.attn_dist_unet import ModelOutput
 
 
@@ -17,6 +20,12 @@ class EquivariantTestModel(nn.Module):
     def forward(self, image: torch.Tensor) -> ModelOutput:
         self.calls += 1
         return ModelOutput(mask_logits=image[:, :1], distance=image[:, 1:2])
+
+
+class ZeroDistanceModel(nn.Module):
+    def forward(self, image: torch.Tensor) -> ModelOutput:
+        zeros = image[:, :1] * 0
+        return ModelOutput(mask_logits=zeros, distance=zeros)
 
 
 def test_postprocessing_separates_two_distance_peaks() -> None:
@@ -61,6 +70,56 @@ def test_tta_batches_all_views_in_one_equivariant_model_call() -> None:
     np.testing.assert_allclose(augmented["mask"], reference["mask"], atol=1e-6)
     np.testing.assert_allclose(augmented["dist_map"], reference["dist_map"], atol=1e-6)
     assert float(augmented["uncertainty"].max()) < 1e-6
+
+
+@pytest.mark.parametrize(
+    ("activation", "expected"), [("identity", 0.0), ("sigmoid", 0.5)]
+)
+def test_inference_applies_declared_distance_activation(
+    activation: Literal["identity", "sigmoid"], expected: float
+) -> None:
+    image = np.zeros((16, 16, 3), dtype=np.uint8)
+    engine = AttnDistInference(
+        ZeroDistanceModel(),
+        "cpu",
+        distance_activation=activation,
+    )
+
+    result = engine.predict_maps(image)
+
+    assert float(result["dist_map"].mean()) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(
+    ("model_contract", "expected"),
+    [({}, "identity"), ({"distance_activation": "sigmoid"}, "sigmoid")],
+)
+def test_checkpoint_distance_activation_is_explicit_and_legacy_safe(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    model_contract: dict[str, str],
+    expected: str,
+) -> None:
+    checkpoint = tmp_path / "model.pt"
+    torch.save(
+        {
+            "format_version": 2,
+            "artifact_type": "attn-dist-inference",
+            "config": {"model_name": "attn-dist", "encoder": "test"},
+            "model_contract": model_contract,
+            "model_state_dict": {},
+        },
+        checkpoint,
+    )
+    monkeypatch.setattr(
+        predictor_module,
+        "build_model",
+        lambda model_name, encoder_name, encoder_weights: ZeroDistanceModel(),
+    )
+
+    engine = AttnDistInference.from_checkpoint(checkpoint)
+
+    assert engine.distance_activation == expected
 
 
 def test_postprocess_configuration_rejects_invalid_values() -> None:

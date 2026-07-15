@@ -15,12 +15,13 @@ authors = [
   {name = "Alan Joseph"},
 ]
 dependencies = [
-  "albumentations>=1.4,<3",
-  "fastapi>=0.115,<1",
+  "albumentations>=2.0.8,<2.1",
+  "fastapi>=0.125,<0.140",
   "matplotlib>=3.8,<4",
   "numpy>=1.26,<3",
   "opencv-python-headless>=4.9,<5",
   "pillow>=10,<12",
+  "pydantic>=2.12,<3",
   "python-multipart>=0.0.12,<1",
   "scipy>=1.12,<2",
   "scikit-image>=0.22,<1",
