@@ -12,6 +12,8 @@ from importlib.metadata import version
 from pathlib import Path
 from uuid import uuid4
 
+PYTORCH_CPU_INDEX = "https://download.pytorch.org/whl/cpu"
+
 
 class SbomGenerationError(RuntimeError):
     """Raised when the locked dependency audit cannot produce acceptable evidence."""
@@ -101,6 +103,8 @@ def generate_sbom(
         "--requirement",
         str(requirements),
         "--require-hashes",
+        "--extra-index-url",
+        PYTORCH_CPU_INDEX,
         "--disable-pip",
         "--strict",
         "--format",

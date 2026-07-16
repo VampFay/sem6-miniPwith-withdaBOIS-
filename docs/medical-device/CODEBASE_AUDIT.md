@@ -106,10 +106,13 @@ repository work alone.
   immutable-digest distroless Debian 12 Python runtime, separates the dependency build stage, has no
   runtime shell or package manager, and runs as UID/GID 65532. Python 3.11 was added to the full CI
   test matrix because it is the container interpreter. The local ARM64 dependency build completed,
-  but local Docker storage failed with filesystem I/O errors during final image commit, so no
-  passing final-image scan or runtime claim is made here. Clean CI must build, smoke-test, scan, and
-  retain the SBOM for the frozen target image before the `SOFTWARE` or `DEPLOYMENT` gate can be
-  approved.
+  but local Docker storage failed with filesystem I/O errors during final image commit. GitHub CI
+  subsequently built the AMD64 image and passed its read-only, native-library, audit-chain and
+  numeric non-root smoke checks. Its Trivy gate correctly rejected the image because the pinned
+  distroless Debian runtime still contains release-blocking OS findings, including critical SQLite
+  and zlib findings. No finding is suppressed and no passing final-image security claim is made.
+  A patched runtime and clean scan, or a formally approved evidence-backed disposition where legally
+  and clinically acceptable, is required before the `SOFTWARE` or `DEPLOYMENT` gate can be approved.
 - `./setup.sh release-gate`: exits nonzero and lists all 13 pending gates, which is the correct current
   safety outcome.
 
