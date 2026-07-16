@@ -21,6 +21,7 @@ def fake_audit(
     def run(command: list[str], check: bool) -> subprocess.CompletedProcess[str]:
         assert not check
         assert command[command.index("--extra-index-url") + 1] == sbom_module.PYTORCH_CPU_INDEX
+        assert command[command.index("--vulnerability-service") + 1] == "osv"
         output = Path(command[command.index("--output") + 1])
         output.write_text(
             json.dumps(

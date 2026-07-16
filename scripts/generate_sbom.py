@@ -105,6 +105,8 @@ def generate_sbom(
         "--require-hashes",
         "--extra-index-url",
         PYTORCH_CPU_INDEX,
+        "--vulnerability-service",
+        "osv",
         "--disable-pip",
         "--strict",
         "--format",
