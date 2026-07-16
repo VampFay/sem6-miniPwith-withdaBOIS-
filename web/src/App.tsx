@@ -67,6 +67,7 @@ export default function App() {
         nextRequest.caseId,
         nextRequest.file,
         nextRequest.options,
+        health?.operating_mode ?? 'invalid',
         controller.signal,
       );
       if (controller.signal.aborted) return;
@@ -83,7 +84,7 @@ export default function App() {
     } finally {
       if (controllerRef.current === controller) controllerRef.current = null;
     }
-  }, []);
+  }, [health?.operating_mode]);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden border border-white/5 bg-[#090a0c]">

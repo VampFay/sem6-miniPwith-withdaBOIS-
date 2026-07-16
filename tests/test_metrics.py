@@ -2,16 +2,21 @@ import numpy as np
 import pytest
 from scipy.optimize import linear_sum_assignment
 
-from src.utils.metrics import calculate_aji, calculate_instance_metrics, calculate_metrics
+from src.utils.metrics import (
+    calculate_aji,
+    calculate_aji_plus,
+    calculate_instance_metrics,
+    calculate_metrics,
+)
 
 
 def brute_force_instance_scores(
     truth: np.ndarray, prediction: np.ndarray, match_iou: float = 0.5
-) -> tuple[float, float, float, float, float]:
+) -> tuple[float, float, float, float, float, float]:
     true_masks = [truth == value for value in np.unique(truth) if value > 0]
     pred_masks = [prediction == value for value in np.unique(prediction) if value > 0]
     if not true_masks and not pred_masks:
-        return 1.0, 1.0, 1.0, 1.0, 1.0
+        return 1.0, 1.0, 1.0, 1.0, 1.0, 1.0
     iou = np.zeros((len(true_masks), len(pred_masks)), dtype=np.float64)
     intersections = np.zeros_like(iou)
     unions = np.zeros_like(iou)
@@ -22,25 +27,46 @@ def brute_force_instance_scores(
             if intersections[row, column]:
                 iou[row, column] = intersections[row, column] / unions[row, column]
     rows, columns = linear_sum_assignment(-iou) if iou.size else ([], [])
-    aji_pairs = [
+    aji_plus_pairs = [
         (row, column)
         for row, column in zip(rows, columns, strict=True)
         if iou[row, column] > 0
     ]
-    matched_rows = {row for row, _ in aji_pairs}
-    matched_columns = {column for _, column in aji_pairs}
-    aji_intersection = sum(intersections[row, column] for row, column in aji_pairs)
-    aji_union = sum(unions[row, column] for row, column in aji_pairs)
-    aji_union += sum(mask.sum() for row, mask in enumerate(true_masks) if row not in matched_rows)
-    aji_union += sum(
+    matched_rows = {row for row, _ in aji_plus_pairs}
+    matched_columns = {column for _, column in aji_plus_pairs}
+    aji_plus_intersection = sum(intersections[row, column] for row, column in aji_plus_pairs)
+    aji_plus_union = sum(unions[row, column] for row, column in aji_plus_pairs)
+    aji_plus_union += sum(
+        mask.sum() for row, mask in enumerate(true_masks) if row not in matched_rows
+    )
+    aji_plus_union += sum(
         mask.sum() for column, mask in enumerate(pred_masks) if column not in matched_columns
+    )
+    aji_plus = float(aji_plus_intersection / aji_plus_union) if aji_plus_union else 1.0
+
+    aji_intersection = 0.0
+    aji_union = 0.0
+    aji_columns: set[int] = set()
+    for row, true_mask in enumerate(true_masks):
+        if not pred_masks:
+            aji_union += true_mask.sum()
+            continue
+        column = int(np.argmax(iou[row]))
+        if intersections[row, column] == 0:
+            aji_union += true_mask.sum()
+            continue
+        aji_intersection += intersections[row, column]
+        aji_union += unions[row, column]
+        aji_columns.add(column)
+    aji_union += sum(
+        mask.sum() for column, mask in enumerate(pred_masks) if column not in aji_columns
     )
     aji = float(aji_intersection / aji_union) if aji_union else 1.0
 
     matches = [
         iou[row, column]
         for row, column in zip(rows, columns, strict=True)
-        if iou[row, column] >= match_iou
+        if iou[row, column] > match_iou
     ]
     true_positive = len(matches)
     false_positive = len(pred_masks) - true_positive
@@ -55,6 +81,7 @@ def brute_force_instance_scores(
     )
     return (
         aji,
+        aji_plus,
         segmentation_quality * recognition_quality,
         detection_f1,
         segmentation_quality,
@@ -79,6 +106,7 @@ def test_instance_metrics_are_exact_for_identical_instances() -> None:
     result = calculate_instance_metrics(instances, instances)
     assert calculate_aji(instances, instances) == 1.0
     assert result.aji == 1.0
+    assert result.aji_plus == 1.0
     assert result.pq == 1.0
     assert result.detection_f1 == 1.0
 
@@ -101,10 +129,12 @@ def test_instance_metrics_score_a_merged_pair() -> None:
 
     result = calculate_instance_metrics(truth, prediction)
 
-    assert result.aji == pytest.approx(1 / 3)
-    assert result.detection_f1 == pytest.approx(2 / 3)
-    assert result.segmentation_quality == pytest.approx(0.5)
-    assert result.pq == pytest.approx(1 / 3)
+    assert result.aji == pytest.approx(0.5)
+    assert result.aji_plus == pytest.approx(1 / 3)
+    assert calculate_aji_plus(truth, prediction) == pytest.approx(1 / 3)
+    assert result.detection_f1 == 0.0
+    assert result.segmentation_quality == 0.0
+    assert result.pq == 0.0
 
 
 def test_instance_metrics_support_sparse_noncontiguous_ids() -> None:
@@ -125,6 +155,7 @@ def test_vectorized_instance_metrics_match_brute_force_reference() -> None:
         actual = calculate_instance_metrics(truth, prediction)
         assert (
             actual.aji,
+            actual.aji_plus,
             actual.pq,
             actual.detection_f1,
             actual.segmentation_quality,

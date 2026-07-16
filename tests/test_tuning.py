@@ -35,6 +35,7 @@ def test_tuning_score_is_exact_for_one_clean_instance() -> None:
 
     assert result["dice"] == 1.0
     assert result["aji"] == 1.0
+    assert result["aji_plus"] == 1.0
     assert result["pq"] == 1.0
 
 
@@ -55,6 +56,7 @@ def test_calibrated_checkpoint_records_selected_parameters(tmp_path) -> None:
         "samples": 10.0,
         "dice": 0.8,
         "aji": 0.5,
+        "aji_plus": 0.55,
         "pq": 0.4,
         "detection_f1": 0.6,
         "sq": 0.7,
@@ -67,3 +69,4 @@ def test_calibrated_checkpoint_records_selected_parameters(tmp_path) -> None:
     assert checkpoint["postprocessing"] == settings.as_dict()
     assert checkpoint["calibration"]["scope"] == "validation_fold_2_only"
     assert checkpoint["calibration"]["validation_metrics"]["pq"] == 0.4
+    assert checkpoint["calibration"]["validation_metrics"]["aji_plus"] == 0.55

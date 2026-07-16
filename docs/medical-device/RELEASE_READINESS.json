@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "product": "Attn-Dist-Net",
+  "disposition": "release_blocked",
+  "gates": [
+    {"id": "QMS", "title": "Operational quality management system", "required": true, "status": "pending", "owner": "quality-manager-unassigned", "evidence": [], "approver": null, "approved_at": null},
+    {"id": "INTENDED_USE", "title": "Approved intended use and claims", "required": true, "status": "pending", "owner": "clinical-regulatory-unassigned", "evidence": [], "approver": null, "approved_at": null},
+    {"id": "REGULATORY", "title": "Market classification and authorization", "required": true, "status": "pending", "owner": "regulatory-lead-unassigned", "evidence": [], "approver": null, "approved_at": null},
+    {"id": "RISK", "title": "Risk management file and residual-risk acceptance", "required": true, "status": "pending", "owner": "clinical-safety-unassigned", "evidence": [], "approver": null, "approved_at": null},
+    {"id": "SOFTWARE", "title": "Independent software verification and anomaly disposition", "required": true, "status": "pending", "owner": "verification-lead-unassigned", "evidence": [], "approver": null, "approved_at": null},
+    {"id": "CYBERSECURITY", "title": "Threat model, SBOM, penetration and vulnerability acceptance", "required": true, "status": "pending", "owner": "security-lead-unassigned", "evidence": [], "approver": null, "approved_at": null},
+    {"id": "DATA_LICENSE", "title": "Dataset/model provenance and commercial license clearance", "required": true, "status": "pending", "owner": "legal-owner-unassigned", "evidence": [], "approver": null, "approved_at": null},
+    {"id": "CLINICAL", "title": "External and prospective clinical validation", "required": true, "status": "pending", "owner": "clinical-lead-unassigned", "evidence": [], "approver": null, "approved_at": null},
+    {"id": "USABILITY", "title": "Human-factors and workflow validation", "required": true, "status": "pending", "owner": "usability-lead-unassigned", "evidence": [], "approver": null, "approved_at": null},
+    {"id": "PRIVACY", "title": "Privacy impact, data governance and agreements", "required": true, "status": "pending", "owner": "privacy-officer-unassigned", "evidence": [], "approver": null, "approved_at": null},
+    {"id": "DEPLOYMENT", "title": "Validated build, installation, operations, backup and rollback", "required": true, "status": "pending", "owner": "operations-owner-unassigned", "evidence": [], "approver": null, "approved_at": null},
+    {"id": "LABELING", "title": "Approved labeling, training and contraindications", "required": true, "status": "pending", "owner": "regulatory-lead-unassigned", "evidence": [], "approver": null, "approved_at": null},
+    {"id": "POSTMARKET", "title": "Complaint, vigilance, monitoring and CAPA readiness", "required": true, "status": "pending", "owner": "quality-manager-unassigned", "evidence": [], "approver": null, "approved_at": null}
+  ]
+}

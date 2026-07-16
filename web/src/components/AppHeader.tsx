@@ -31,11 +31,11 @@ export function AppHeader({appState, health, onNewCase}: AppHeaderProps) {
       <div className="flex items-center gap-3">
         <div className="hidden items-center gap-2 border-r border-white/10 pr-3 sm:flex">
           <span className={`h-2 w-2 rounded-full ${health ? health.ready ? 'bg-emerald-400' : health.status === 'invalid_checkpoint' ? 'bg-red-400' : 'bg-amber-400' : 'status-pulse bg-zinc-500'}`} />
-          <span className="text-[10px] font-bold uppercase text-zinc-400">{health ? health.ready ? 'Model validated' : health.status === 'invalid_checkpoint' ? 'Invalid checkpoint' : 'Setup required' : 'Checking runtime'}</span>
+          <span className="text-[10px] font-bold uppercase text-zinc-400">{health ? health.ready ? 'Checkpoint verified' : health.status === 'invalid_checkpoint' ? 'Invalid checkpoint' : health.status === 'configuration_error' ? 'Configuration error' : 'Setup required' : 'Checking runtime'}</span>
         </div>
         <div className="flex items-center gap-2 text-zinc-300">
           {health?.device ? <Cpu className="h-4 w-4 text-blue-400" /> : <ShieldCheck className="h-4 w-4 text-zinc-500" />}
-          <span className="hidden text-[10px] font-bold uppercase sm:block">Research workspace</span>
+          <span className="hidden text-[10px] font-bold uppercase sm:block">{health?.operating_mode === 'controlled' ? 'Controlled workspace' : 'Research workspace'}</span>
         </div>
       </div>
     </header>

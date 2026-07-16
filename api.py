@@ -1,43 +1,64 @@
 from __future__ import annotations
 
-import base64
-import hashlib
-import io
 import logging
 import os
+import re
+import secrets
 import time
-import warnings
 from collections.abc import Awaitable, Callable
 from functools import lru_cache
 from pathlib import Path
-from threading import Lock
 from typing import Annotated
 from uuid import uuid4
 
-import cv2
-import numpy as np
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from PIL import Image, UnidentifiedImageError
 
+from src.analysis_service import AnalysisOptions, perform_analysis
 from src.config import select_device
-from src.inference import AttnDistInference, PostprocessConfig
-from src.reporting import analysis_pdf, build_artifacts, measurements_csv
+from src.http_limits import RequestBodyLimitMiddleware
+from src.inference import AttnDistInference
+from src.input_validation import ImageInputError, decode_image
+from src.provenance import AuditStore
+from src.runtime import (
+    RuntimeConfig,
+    RuntimeConfigurationError,
+    parse_allowed_origins,
+    read_verified_checkpoint,
+)
 
 LOGGER = logging.getLogger("attn_dist.api")
 ROOT = Path(__file__).resolve().parent
 WEB_DIST = ROOT / "web" / "dist"
-MAX_UPLOAD_BYTES = int(os.getenv("ATTNDIST_MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
-MAX_IMAGE_PIXELS = int(os.getenv("ATTNDIST_MAX_IMAGE_PIXELS", str(2048 * 2048)))
+
+
+def read_integer_setting(name: str, default: int, minimum: int) -> int:
+    raw = os.getenv(name, str(default))
+    try:
+        value = int(raw)
+    except ValueError as error:
+        raise RuntimeConfigurationError(f"{name} must be an integer.") from error
+    if value < minimum:
+        raise RuntimeConfigurationError(f"{name} must be at least {minimum}.")
+    return value
+
+
+MAX_UPLOAD_BYTES = read_integer_setting(
+    "ATTNDIST_MAX_UPLOAD_BYTES", 25 * 1024 * 1024, 1
+)
+MAX_IMAGE_PIXELS = read_integer_setting("ATTNDIST_MAX_IMAGE_PIXELS", 2048 * 2048, 1)
+MAX_MULTIPART_OVERHEAD_BYTES = read_integer_setting(
+    "ATTNDIST_MAX_MULTIPART_OVERHEAD_BYTES", 256 * 1024, 0
+)
 CHECKPOINT_CANDIDATES = (
     Path("outputs_v2/checkpoints/best_iou_calibrated.pt"),
     Path("outputs_v2/checkpoints/best_iou.pt"),
     Path("outputs_v2/checkpoints/best_model.pth"),
 )
-SUPPORTED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/tiff"}
-INFERENCE_LOCK = Lock()
+REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
+ACTOR_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@:-]{0,127}$")
 
 app = FastAPI(
     title="Attn-Dist-Net API",
@@ -46,11 +67,17 @@ app = FastAPI(
     redoc_url=None,
 )
 
-allowed_origins = [
-    origin.strip()
-    for origin in os.getenv("ATTNDIST_ALLOWED_ORIGINS", "").split(",")
-    if origin.strip()
-]
+def maximum_request_bytes() -> int:
+    return MAX_UPLOAD_BYTES + MAX_MULTIPART_OVERHEAD_BYTES
+
+
+app.add_middleware(
+    RequestBodyLimitMiddleware,
+    limit_getter=maximum_request_bytes,
+    paths=frozenset({"/api/analyze"}),
+)
+
+allowed_origins = list(parse_allowed_origins(os.getenv("ATTNDIST_ALLOWED_ORIGINS", "")))
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -59,7 +86,7 @@ app.add_middleware(
     else r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=False,
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type", "X-Request-ID"],
+    allow_headers=["Authorization", "Content-Type", "X-Actor-ID", "X-Request-ID"],
 )
 
 
@@ -67,7 +94,12 @@ app.add_middleware(
 async def secure_and_log(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
-    request_id = request.headers.get("X-Request-ID", str(uuid4()))[:128]
+    supplied_request_id = request.headers.get("X-Request-ID", "")
+    request_id = (
+        supplied_request_id
+        if REQUEST_ID_PATTERN.fullmatch(supplied_request_id)
+        else str(uuid4())
+    )
     started = time.perf_counter()
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
@@ -97,37 +129,63 @@ def checkpoint_path() -> Path | None:
 
 
 @lru_cache(maxsize=2)
-def load_engine(path: str, modified_ns: int) -> AttnDistInference:
-    del modified_ns
-    return AttnDistInference.from_checkpoint(path, select_device())
+def load_engine(path: str, digest: str) -> AttnDistInference:
+    content, verified_digest = read_verified_checkpoint(Path(path), digest)
+    if verified_digest != digest:
+        raise RuntimeConfigurationError("Checkpoint changed while it was being loaded.")
+    return AttnDistInference.from_checkpoint_bytes(content, select_device())
 
 
-@lru_cache(maxsize=2)
-def checkpoint_sha256(path: str, modified_ns: int) -> str:
-    del modified_ns
-    checksum = hashlib.sha256()
-    with Path(path).open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            checksum.update(block)
-    return checksum.hexdigest()
-
-
-def active_engine() -> tuple[Path, AttnDistInference]:
+def active_engine(config: RuntimeConfig | None = None) -> tuple[Path, str, AttnDistInference]:
+    config = config or RuntimeConfig.from_environment()
     checkpoint = checkpoint_path()
     if checkpoint is None:
         raise FileNotFoundError("No inference checkpoint is installed")
     resolved = checkpoint.resolve()
-    modified_ns = resolved.stat().st_mtime_ns
-    return resolved, load_engine(str(resolved), modified_ns)
+    _, digest = read_verified_checkpoint(resolved, config.approved_checkpoint_sha256)
+    return resolved, digest, load_engine(str(resolved), digest)
 
 
 def runtime_status() -> dict[str, object]:
     device = select_device().type.upper()
+    try:
+        config = RuntimeConfig.from_environment()
+    except RuntimeConfigurationError:
+        LOGGER.exception("Runtime configuration validation failed")
+        return {
+            "status": "configuration_error",
+            "ready": False,
+            "operating_mode": "invalid",
+            "release_id": None,
+            "device": device,
+            "checkpoint": None,
+            "checkpoint_sha256": None,
+            "postprocessing": None,
+            "detail": "Runtime safeguards are incomplete or invalid.",
+        }
+    if config.is_controlled and config.audit_dir is not None:
+        try:
+            AuditStore(config.audit_dir).ensure_ready()
+        except (OSError, RuntimeError):
+            LOGGER.exception("Controlled audit storage validation failed")
+            return {
+                "status": "configuration_error",
+                "ready": False,
+                "operating_mode": config.operating_mode,
+                "release_id": config.release_id,
+                "device": device,
+                "checkpoint": None,
+                "checkpoint_sha256": None,
+                "postprocessing": None,
+                "detail": "Controlled audit storage is unavailable or invalid.",
+            }
     checkpoint = checkpoint_path()
     if checkpoint is None:
         return {
             "status": "setup_required",
             "ready": False,
+            "operating_mode": config.operating_mode,
+            "release_id": config.release_id,
             "device": device,
             "checkpoint": None,
             "checkpoint_sha256": None,
@@ -135,14 +193,15 @@ def runtime_status() -> dict[str, object]:
             "detail": "No version-2 inference checkpoint is installed.",
         }
     try:
-        resolved, engine = active_engine()
-        modified_ns = resolved.stat().st_mtime_ns
+        resolved, digest, engine = active_engine(config)
         return {
             "status": "ready",
             "ready": True,
+            "operating_mode": config.operating_mode,
+            "release_id": config.release_id,
             "device": device,
             "checkpoint": resolved.name,
-            "checkpoint_sha256": checkpoint_sha256(str(resolved), modified_ns),
+            "checkpoint_sha256": digest,
             "postprocessing": engine.postprocess.as_dict(),
             "detail": None,
         }
@@ -151,32 +210,14 @@ def runtime_status() -> dict[str, object]:
         return {
             "status": "invalid_checkpoint",
             "ready": False,
+            "operating_mode": config.operating_mode,
+            "release_id": config.release_id,
             "device": device,
             "checkpoint": checkpoint.name,
             "checkpoint_sha256": None,
             "postprocessing": None,
             "detail": "Checkpoint failed schema or model compatibility validation.",
         }
-
-
-def encode_png(image: np.ndarray) -> str:
-    array = np.asarray(image)
-    if array.dtype != np.uint8:
-        array = np.clip(array, 0, 255).astype(np.uint8)
-    stream = io.BytesIO()
-    Image.fromarray(array).save(stream, format="PNG")
-    return base64.b64encode(stream.getvalue()).decode("ascii")
-
-
-def color_map(values: np.ndarray, palette: int) -> np.ndarray:
-    finite = np.nan_to_num(values.astype(np.float32), copy=False)
-    minimum = float(finite.min())
-    span = float(finite.max()) - minimum
-    normalized = ((finite - minimum) * (255.0 / span)).astype(np.uint8) if span else np.zeros(
-        finite.shape, dtype=np.uint8
-    )
-    colored = cv2.applyColorMap(normalized, palette)
-    return np.asarray(cv2.cvtColor(colored, cv2.COLOR_BGR2RGB))
 
 
 @app.get("/api/live")
@@ -195,92 +236,93 @@ def ready() -> Response:
     return JSONResponse(status_code=200 if status["ready"] else 503, content=status)
 
 
+def controlled_actor(request: Request, config: RuntimeConfig) -> str | None:
+    if not config.is_controlled:
+        return None
+    authorization = request.headers.get("Authorization", "")
+    expected = f"Bearer {config.api_token}"
+    if not secrets.compare_digest(authorization, expected):
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication is required for controlled operation.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    actor = request.headers.get("X-Actor-ID", "").strip()
+    if not ACTOR_ID_PATTERN.fullmatch(actor):
+        raise HTTPException(
+            status_code=400,
+            detail="A valid X-Actor-ID is required for the audit record.",
+        )
+    return actor
+
+
 @app.post("/api/analyze")
 def analyze(
+    request: Request,
     file: Annotated[UploadFile, File()],
-    analysis_id: Annotated[str, Form(min_length=1, max_length=64, pattern=r".*\S.*")],
-    use_tta: Annotated[bool, Form()] = False,
+    analysis_id: Annotated[
+        str,
+        Form(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$"),
+    ],
+    use_tta: Annotated[bool | None, Form()] = None,
     mask_threshold: Annotated[float | None, Form(ge=0.1, le=0.9)] = None,
     peak_threshold: Annotated[float | None, Form(ge=0.1, le=0.9)] = None,
     min_size: Annotated[int | None, Form(ge=1, le=1000)] = None,
 ) -> dict[str, object]:
     try:
-        _, engine = active_engine()
+        config = RuntimeConfig.from_environment()
+    except RuntimeConfigurationError as error:
+        raise HTTPException(status_code=503, detail="Runtime safeguards are not ready.") from error
+    actor = controlled_actor(request, config)
+    if config.is_controlled and config.audit_dir is not None:
+        try:
+            AuditStore(config.audit_dir).ensure_ready()
+        except (OSError, RuntimeError) as error:
+            raise HTTPException(
+                status_code=503, detail="Controlled audit storage is unavailable or invalid."
+            ) from error
+    try:
+        checkpoint, checkpoint_digest, engine = active_engine(config)
     except FileNotFoundError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
+    except RuntimeConfigurationError as error:
+        raise HTTPException(status_code=503, detail="Runtime safeguards are not ready.") from error
     except Exception as error:
         raise HTTPException(status_code=503, detail="Installed checkpoint is invalid.") from error
-    if file.content_type not in SUPPORTED_IMAGE_TYPES:
-        raise HTTPException(status_code=415, detail="Upload a PNG, JPEG, or TIFF image.")
+    if config.is_controlled and any(
+        value is not None for value in (use_tta, mask_threshold, peak_threshold, min_size)
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="Controlled mode uses locked, approved inference settings.",
+        )
     content = file.file.read(MAX_UPLOAD_BYTES + 1)
     if not content:
         raise HTTPException(status_code=422, detail="Uploaded image is empty.")
     if len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="Image exceeds the upload limit.")
     try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("error", Image.DecompressionBombWarning)
-            source = Image.open(io.BytesIO(content))
-            if source.width * source.height > MAX_IMAGE_PIXELS:
-                raise HTTPException(status_code=413, detail="Image exceeds the pixel limit.")
-            image = np.asarray(source.convert("RGB"))
-    except (Image.DecompressionBombError, Image.DecompressionBombWarning) as error:
-        raise HTTPException(status_code=413, detail="Image exceeds the pixel limit.") from error
-    except (UnidentifiedImageError, OSError) as error:
-        raise HTTPException(
-            status_code=422, detail="Uploaded file is not a valid image."
-        ) from error
-
-    settings = PostprocessConfig(
-        mask_threshold=engine.postprocess.mask_threshold
-        if mask_threshold is None
-        else mask_threshold,
-        peak_threshold=engine.postprocess.peak_threshold
-        if peak_threshold is None
-        else peak_threshold,
-        min_size=engine.postprocess.min_size if min_size is None else min_size,
-        gaussian_sigma=engine.postprocess.gaussian_sigma,
-        peak_window_size=engine.postprocess.peak_window_size,
-    )
-    with INFERENCE_LOCK:
-        result = engine.predict_full(
-            image,
+        decoded = decode_image(content, file.content_type, MAX_IMAGE_PIXELS)
+    except ImageInputError as error:
+        status_code = 415 if error.kind in {"unsupported_media_type", "format_mismatch"} else 422
+        if error.kind == "pixel_limit":
+            status_code = 413
+        raise HTTPException(status_code=status_code, detail=str(error)) from error
+    return perform_analysis(
+        decoded=decoded,
+        engine=engine,
+        checkpoint=checkpoint,
+        checkpoint_digest=checkpoint_digest,
+        config=config,
+        analysis_id=analysis_id,
+        actor=actor,
+        options=AnalysisOptions(
             use_tta=use_tta,
-            mask_threshold=settings.mask_threshold,
-            peak_threshold=settings.peak_threshold,
-            min_size=settings.min_size,
-            gaussian_sigma=settings.gaussian_sigma,
-            peak_window_size=settings.peak_window_size,
-        )
-    artifacts = build_artifacts(image, result["instances"])
-    count = len(artifacts.measurements)
-    mean_area = (
-        float(np.mean([row["area_px"] for row in artifacts.measurements])) if count else 0.0
+            mask_threshold=mask_threshold,
+            peak_threshold=peak_threshold,
+            min_size=min_size,
+        ),
     )
-    probability = (np.clip(result["mask"], 0, 1) * 255).astype(np.uint8)
-    return {
-        "analysis_id": analysis_id,
-        "settings": {"use_tta": use_tta, **settings.as_dict()},
-        "metrics": {
-            "nucleus_count": count,
-            "mean_area_px": mean_area,
-            "mean_uncertainty": float(result["uncertainty"].mean()),
-        },
-        "images": {
-            "overlay": encode_png(artifacts.overlay),
-            "probability": encode_png(probability),
-            "instances": encode_png(color_map(result["instances"], cv2.COLORMAP_TURBO)),
-            "distance": encode_png(color_map(result["dist_map"], cv2.COLORMAP_TURBO)),
-            "uncertainty": encode_png(color_map(result["uncertainty"], cv2.COLORMAP_MAGMA)),
-        },
-        "measurements": artifacts.measurements,
-        "downloads": {
-            "csv": base64.b64encode(measurements_csv(artifacts.measurements)).decode("ascii"),
-            "pdf": base64.b64encode(
-                analysis_pdf(image, artifacts.overlay, result["mask"], count, analysis_id)
-            ).decode("ascii"),
-        },
-    }
 
 
 if (WEB_DIST / "assets").is_dir():

@@ -75,7 +75,7 @@ def write_calibrated_checkpoint(
         "samples": int(validation_result["samples"]),
         "validation_metrics": {
             name: float(validation_result[name])
-            for name in ("dice", "aji", "pq", "detection_f1", "sq")
+            for name in ("dice", "aji", "aji_plus", "pq", "detection_f1", "sq")
         },
     }
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -173,7 +173,14 @@ def score_settings(
     instances: np.ndarray,
     validation_ids: np.ndarray,
 ) -> dict[str, float]:
-    totals = {"dice": 0.0, "aji": 0.0, "pq": 0.0, "detection_f1": 0.0, "sq": 0.0}
+    totals = {
+        "dice": 0.0,
+        "aji": 0.0,
+        "aji_plus": 0.0,
+        "pq": 0.0,
+        "detection_f1": 0.0,
+        "sq": 0.0,
+    }
     started = time.perf_counter()
     for position in positions:
         prediction = postprocess_instances(
@@ -190,6 +197,7 @@ def score_settings(
         semantic = calculate_metrics(truth > 0, masks[position] >= settings.mask_threshold)
         totals["dice"] += semantic["Dice"]
         totals["aji"] += instance_metrics.aji
+        totals["aji_plus"] += instance_metrics.aji_plus
         totals["pq"] += instance_metrics.pq
         totals["detection_f1"] += instance_metrics.detection_f1
         totals["sq"] += instance_metrics.segmentation_quality
@@ -203,7 +211,7 @@ def score_settings(
 
 
 def rank_key(row: dict[str, float | int]) -> tuple[float, float, float]:
-    return (-float(row["pq"]), -float(row["detection_f1"]), -float(row["aji"]))
+    return (-float(row["pq"]), -float(row["detection_f1"]), -float(row["aji_plus"]))
 
 
 def parse_args() -> argparse.Namespace:
@@ -316,7 +324,7 @@ def main() -> None:
         "best": best,
         "absolute_gain": {
             name: float(best[name]) - float(baseline_result[name])
-            for name in ("dice", "aji", "pq", "detection_f1", "sq")
+            for name in ("dice", "aji", "aji_plus", "pq", "detection_f1", "sq")
         },
         "full_validation_leaderboard": finalists,
         "coarse_leaderboard": coarse,

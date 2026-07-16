@@ -1,95 +1,18 @@
 from __future__ import annotations
 
+import io
 from collections.abc import Callable
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 import numpy as np
 import torch
 import torchvision.transforms.functional as TF
-from scipy.ndimage import gaussian_filter, label, maximum_filter
-from skimage.segmentation import watershed
 from torch import nn
 
 from src.config import IMAGENET_MEAN, IMAGENET_STD
+from src.inference.postprocessing import PostprocessConfig, postprocess_instances
 from src.models.factory import build_model
-
-
-@dataclass(frozen=True)
-class PostprocessConfig:
-    mask_threshold: float = 0.5
-    peak_threshold: float = 0.35
-    min_size: int = 10
-    gaussian_sigma: float = 1.0
-    peak_window_size: int = 7
-
-    def __post_init__(self) -> None:
-        if not 0 < self.mask_threshold < 1 or not 0 < self.peak_threshold < 1:
-            raise ValueError("Mask and peak thresholds must be in the interval (0, 1)")
-        if self.min_size < 1:
-            raise ValueError("Minimum instance size must be positive")
-        if self.gaussian_sigma < 0:
-            raise ValueError("Gaussian sigma must be non-negative")
-        if self.peak_window_size < 1 or self.peak_window_size % 2 == 0:
-            raise ValueError("Peak window size must be a positive odd integer")
-
-    def as_dict(self) -> dict[str, float | int]:
-        return {
-            "mask_threshold": self.mask_threshold,
-            "peak_threshold": self.peak_threshold,
-            "min_size": self.min_size,
-            "gaussian_sigma": self.gaussian_sigma,
-            "peak_window_size": self.peak_window_size,
-        }
-
-
-def postprocess_instances(
-    mask_probability: np.ndarray,
-    distance_map: np.ndarray,
-    mask_threshold: float = 0.5,
-    peak_threshold: float = 0.35,
-    min_size: int = 10,
-    gaussian_sigma: float = 1.0,
-    peak_window_size: int = 7,
-) -> np.ndarray:
-    settings = PostprocessConfig(
-        mask_threshold,
-        peak_threshold,
-        min_size,
-        gaussian_sigma,
-        peak_window_size,
-    )
-    mask_probability = np.asarray(mask_probability)
-    distance_map = np.asarray(distance_map)
-    if (
-        mask_probability.ndim != 2
-        or distance_map.ndim != 2
-        or mask_probability.shape != distance_map.shape
-    ):
-        raise ValueError("Mask probability and distance map must be same-shaped 2D arrays")
-    if not np.isfinite(mask_probability).all() or not np.isfinite(distance_map).all():
-        raise ValueError("Postprocessing inputs must contain only finite values")
-
-    foreground = mask_probability >= settings.mask_threshold
-    components, _ = label(foreground)
-    component_sizes = np.bincount(components.ravel())
-    foreground = foreground & (component_sizes[components] >= settings.min_size)
-    if not foreground.any():
-        return np.zeros(foreground.shape, dtype=np.int32)
-    smooth_distance = gaussian_filter(
-        distance_map.astype(np.float32), sigma=settings.gaussian_sigma
-    )
-    peaks = (
-        (smooth_distance == maximum_filter(smooth_distance, size=settings.peak_window_size))
-        & (smooth_distance >= settings.peak_threshold)
-        & foreground
-    )
-    markers, marker_count = label(peaks)
-    if marker_count == 0:
-        markers, _ = label(foreground)
-    segmented = cast(np.ndarray, watershed(-smooth_distance, markers, mask=foreground))
-    return segmented.astype(np.int32)
 
 
 class AttnDistInference:
@@ -122,6 +45,27 @@ class AttnDistInference:
         **kwargs: int,
     ) -> AttnDistInference:
         checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=True)
+        return cls._from_checkpoint_payload(checkpoint, device, encoder_name, **kwargs)
+
+    @classmethod
+    def from_checkpoint_bytes(
+        cls,
+        content: bytes,
+        device: torch.device | str = "cpu",
+        encoder_name: str = "efficientnet-b0",
+        **kwargs: int,
+    ) -> AttnDistInference:
+        checkpoint = torch.load(io.BytesIO(content), map_location=device, weights_only=True)
+        return cls._from_checkpoint_payload(checkpoint, device, encoder_name, **kwargs)
+
+    @classmethod
+    def _from_checkpoint_payload(
+        cls,
+        checkpoint: dict[str, Any],
+        device: torch.device | str,
+        encoder_name: str,
+        **kwargs: int,
+    ) -> AttnDistInference:
         if checkpoint.get("format_version") != 2:
             raise ValueError("Checkpoint does not use the supported inference format version 2")
         if checkpoint.get("artifact_type") != "attn-dist-inference":
@@ -307,10 +251,14 @@ class AttnDistInference:
         return {
             "mask": mask,
             "dist_map": distance,
-            "uncertainty": maps["uncertainty"],
+            "tta_disagreement": maps["tta_disagreement"],
             "instances": instances,
         }
 
     def predict_maps(self, image: np.ndarray, use_tta: bool = False) -> dict[str, np.ndarray]:
-        mask, distance, uncertainty = self._predict_tiled(image, use_tta)
-        return {"mask": mask, "dist_map": distance, "uncertainty": uncertainty}
+        mask, distance, tta_disagreement = self._predict_tiled(image, use_tta)
+        return {
+            "mask": mask,
+            "dist_map": distance,
+            "tta_disagreement": tta_disagreement,
+        }

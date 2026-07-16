@@ -18,7 +18,7 @@ retains the original checkpoint as the immutable reproduced baseline.
 
 ## Reproduced Baseline
 
-| Dice | IoU | AJI | PQ | Detection F1 | Segmentation quality |
+| Dice | IoU | AJI+ | PQ | Detection F1 | Segmentation quality |
 | ---: | ---: | ---: | ---: | ---: | ---: |
 | 0.8248 | 0.7181 | 0.4811 | 0.3971 | 0.5178 | 0.7365 |
 
@@ -46,7 +46,7 @@ watershed reconstructs globally consistent instances.
 flowchart LR
     A[RGB patch] --> B[EfficientNet encoder]
     B --> C[Attention-gated decoder]
-    C --> D[Foreground probability]
+    C --> D[Foreground score]
     C --> E[Distance map]
     D --> F[Overlap blending]
     E --> F
@@ -56,7 +56,8 @@ flowchart LR
 
 ## Local Setup
 
-Python 3.10-3.13 and Node.js 20 or newer are supported. Python 3.12 and Node.js 22 are used in CI.
+Python 3.10-3.13 and Node.js 20 or newer are supported. Python 3.11 and 3.12, plus Node.js 22,
+are exercised in CI; the minimal production runtime uses Python 3.11.
 
 ```bash
 chmod +x setup.sh
@@ -76,6 +77,7 @@ checkpoint readiness. Other commands:
   --early-stopping-patience 0 --output-dir outputs_v2/e03_bounded_distance
 ./setup.sh training-status
 ./setup.sh evaluate
+./setup.sh sbom outputs_v2/release/sbom.cdx.json
 ./setup.sh tune outputs_v2/checkpoints/best_iou.pt \
   --calibrated-checkpoint outputs_v2/checkpoints/best_iou_calibrated.pt
 ```
@@ -113,7 +115,8 @@ smoke-test artifact and is never a benchmark result.
 
 Publish a value only with the Git commit, dataset manifest, training history, checkpoint hash,
 full `summary.json`, `per_image.csv`, and hardware/runtime record. Semantic IoU must never be
-renamed as AJI.
+renamed as an instance metric. Historical artifacts now label their one-to-one aggregate
+Jaccard value as AJI+; the corrected evaluator reports classic AJI and AJI+ separately.
 
 Method details are in [docs/METHODOLOGY.md](docs/METHODOLOGY.md). The current baseline must remain
 fixed while new choices are developed on fold 2; fold 3 is not an iterative tuning set.
@@ -130,6 +133,13 @@ docker run --rm -p 8000:8000 \
   -v "$PWD/outputs_v2/checkpoints/best_iou_calibrated.pt:/models/best_iou.pt:ro" \
   attn-dist-net
 ```
+
+This command starts research mode only. Controlled-operation environment, gateway trust boundary,
+audit storage, release evidence, and site qualification are specified in
+[docs/medical-device/DEPLOYMENT_AND_OPERATIONS.md](docs/medical-device/DEPLOYMENT_AND_OPERATIONS.md).
+The fail-closed `./setup.sh release-gate` command intentionally rejects the current repository
+until every accountable clinical, quality, security, legal, usability, operational, and regulatory
+gate has dated approval and evidence.
 
 `/api/live` reports process liveness; `/api/ready` returns 503 until the model is validated. Put
 the service behind TLS and authentication, retain one process per accelerator, centralize logs,

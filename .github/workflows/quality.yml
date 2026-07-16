@@ -1,31 +1,141 @@
 name: quality
 
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
   pull_request:
 
 jobs:
-  test:
+  sast:
+    name: CodeQL (${{ matrix.language }})
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: github/codeql-action/init@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          queries: security-extended
+      - uses: github/codeql-action/analyze@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
+        with:
+          category: /language:${{ matrix.language }}
+
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
     env:
       NO_ALBUMENTATIONS_UPDATE: "1"
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
-          python-version: "3.12"
-          cache: pip
-      - uses: actions/setup-node@v6
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - run: python -m pip install --upgrade pip
-      - run: python -m pip install -e ".[dev]"
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        with:
+          version: "0.11.16"
+          enable-cache: false
+      - run: uv sync --frozen --extra dev --extra train
       - run: npm ci --prefix web --no-audit --no-fund
+      - run: uv lock --check
+      - run: |
+          cp requirements.lock /tmp/requirements.lock
+          uv export --frozen --no-dev --no-emit-project \
+            --format requirements-txt --output-file requirements.lock
+          diff -u /tmp/requirements.lock requirements.lock
       - run: bash -n setup.sh
-      - run: ruff check src tests train.py evaluate.py api.py scripts
-      - run: mypy src train.py evaluate.py api.py scripts
-      - run: pytest --cov=src --cov-report=term-missing
+      - run: uv run --no-sync ruff check src tests train.py evaluate.py api.py scripts
+      - run: uv run --no-sync mypy src train.py evaluate.py api.py scripts
+      - run: uv run --no-sync pytest --cov=src --cov=api --cov-report=term-missing --cov-fail-under=80
+      - run: uv run --no-sync pip-audit --local
+      - run: |
+          uv run --no-sync python -m scripts.generate_sbom \
+            --output /tmp/sbom.cdx.json --cache-dir /tmp/pip-audit-cache
+          python -m json.tool /tmp/sbom.cdx.json >/dev/null
+          python -m json.tool /tmp/sbom.cdx.json.receipt.json >/dev/null
       - run: npm run typecheck --prefix web
       - run: npm run build --prefix web
+      - run: npm audit --prefix web --audit-level=high
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - run: docker build --check --platform linux/amd64 .
+      - run: docker build --platform linux/amd64 --tag attn-dist-net:ci .
+      - run: |
+          docker run --rm --pull=never --platform linux/amd64 \
+            --read-only \
+            --tmpfs /tmp:size=64m,uid=65532,gid=65532 \
+            --tmpfs /audit:size=16m,uid=65532,gid=65532,mode=0700 \
+            --entrypoint /usr/bin/python3 attn-dist-net:ci -c \
+            "import importlib.util, torch, api; \
+            from pathlib import Path; \
+            from src.provenance import AuditStore; \
+            audit = AuditStore(Path('/audit')); \
+            receipt = audit.append({'event_type': 'ci-smoke'}); \
+            assert receipt.sequence == 1; \
+            assert audit.verify_chain() == receipt.record_sha256; \
+            assert '+cpu' in torch.__version__; \
+            assert not torch.cuda.is_available(); \
+            assert importlib.util.find_spec('albumentations') is None; \
+            assert importlib.util.find_spec('tensorboard') is None; \
+            assert api.live() == {'status': 'alive'}"
+      - run: test "$(docker image inspect attn-dist-net:ci --format '{{.Config.User}}')" = "65532:65532"
+      - name: Scan image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: attn-dist-net:ci
+          format: table
+          exit-code: "1"
+          ignore-unfixed: false
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+      - name: Scan repository configuration and secrets
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: misconfig,secret
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          skip-setup-trivy: true
+      - name: Generate container CycloneDX SBOM
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: attn-dist-net:ci
+          format: cyclonedx
+          output: container-sbom.cdx.json
+          scanners: vuln
+          skip-setup-trivy: true
+      - run: python -m json.tool container-sbom.cdx.json >/dev/null
+      - name: Retain container SBOM
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: container-sbom-${{ github.sha }}
+          path: container-sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 30

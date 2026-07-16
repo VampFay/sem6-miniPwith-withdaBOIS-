@@ -36,7 +36,7 @@ All 2,722 samples in fold 3 were evaluated once with the checkpoint selected onl
 | IoU | 0.7181 | 0.1476 | [0.7127, 0.7237] |
 | Precision | 0.8046 | 0.1434 | [0.7989, 0.8101] |
 | Recall | 0.8601 | 0.1391 | [0.8550, 0.8651] |
-| AJI | 0.4811 | 0.1673 | [0.4751, 0.4873] |
+| AJI+ | 0.4811 | 0.1673 | [0.4751, 0.4873] |
 | PQ | 0.3971 | 0.1951 | [0.3903, 0.4041] |
 | Detection F1 / recognition quality | 0.5178 | 0.2160 | [0.5101, 0.5256] |
 | Segmentation quality | 0.7365 | 0.1268 | [0.7319, 0.7414] |
@@ -44,6 +44,15 @@ All 2,722 samples in fold 3 were evaluated once with the checkpoint selected onl
 The result has strong binary foreground overlap. Instance detection and separation are the
 limiting factors: matched instances have segmentation quality 0.7365, but recognition quality
 is 0.5178, reducing PQ to 0.3971.
+
+### Metric correction notice (2026-07-16)
+
+The original evaluator used Hungarian one-to-one matching for the value initially labeled
+`AJI`; that definition is AJI+. The evidence files and table label were corrected without
+changing the recorded numbers. The evaluator now reports classic AJI and AJI+ separately and
+uses the standard strict `IoU > 0.5` PQ match rule. Because the historical run used
+`IoU >= 0.5`, this baseline is retained as research provenance but must be rerun with the current
+evaluator before it can support any controlled release claim.
 
 ## Evidence
 

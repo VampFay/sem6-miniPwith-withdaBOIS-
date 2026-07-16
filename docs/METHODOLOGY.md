@@ -41,9 +41,10 @@ recorded in CSV and TensorBoard logs.
 ## Inference
 
 Large images are processed in overlapping 256-pixel tiles. Hann-window weights blend foreground,
-distance, and uncertainty outputs. Optional four-view test-time augmentation averages horizontal
-and vertical reflections in one batched model call; mask standard deviation is reported as
-uncertainty. Checkpoints declare the distance activation used during training. Version-2
+distance, and TTA-disagreement outputs. Optional four-view test-time augmentation averages horizontal
+and vertical reflections in one batched model call; mask standard deviation is reported only as
+TTA disagreement, not calibrated uncertainty. Checkpoints declare the distance activation used
+during training. Version-2
 checkpoints without this field retain legacy identity semantics.
 
 Foreground thresholding and minimum-area filtering precede peak detection. Marker-controlled
@@ -53,9 +54,9 @@ protocol and evidence are in [POSTPROCESSING.md](POSTPROCESSING.md).
 
 ## Evaluation
 
-Semantic evaluation reports Dice, IoU, precision, and recall. Instance evaluation performs
-one-to-one IoU matching and reports AJI, panoptic quality, detection F1, segmentation quality,
-and recognition quality. The full test report includes per-image values and deterministic 95%
+Semantic evaluation reports Dice, IoU, precision, and recall. Instance evaluation reports classic
+AJI, one-to-one AJI+, panoptic quality with strict `IoU > 0.5` matching, detection F1,
+segmentation quality, and recognition quality. The full test report includes per-image values and deterministic 95%
 bootstrap confidence intervals.
 
 The current baseline averages metrics per image for one held-out binary fold. Official PanNuke

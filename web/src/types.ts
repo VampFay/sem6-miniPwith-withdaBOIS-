@@ -3,13 +3,15 @@ export type ResultView =
   | 'source'
   | 'overlay'
   | 'instances'
-  | 'probability'
+  | 'foreground_score'
   | 'distance'
-  | 'uncertainty';
+  | 'tta_disagreement';
 
 export interface HealthStatus {
-  status: 'ready' | 'setup_required' | 'invalid_checkpoint';
+  status: 'ready' | 'setup_required' | 'invalid_checkpoint' | 'configuration_error';
   ready: boolean;
+  operating_mode: 'research' | 'controlled' | 'invalid';
+  release_id: string | null;
   device: 'CPU' | 'CUDA' | 'MPS';
   checkpoint: string | null;
   checkpoint_sha256: string | null;
@@ -34,6 +36,27 @@ export interface NucleusMeasurement {
 
 export interface AnalysisResult {
   analysis_id: string;
+  provenance: {
+    analysis_uuid: string;
+    analysis_id: string;
+    created_at_utc: string;
+    software_version: string;
+    release_id: string;
+    operating_mode: 'research' | 'controlled';
+    input_sha256: string;
+    input_format: string;
+    input_width: number;
+    input_height: number;
+    checkpoint_name: string;
+    checkpoint_sha256: string;
+    runtime_device: string;
+    settings: Record<string, boolean | number>;
+  };
+  audit_receipt: {
+    sequence: number;
+    record_sha256: string;
+    previous_record_sha256: string | null;
+  } | null;
   settings: {
     use_tta: boolean;
     mask_threshold: number;
@@ -45,19 +68,20 @@ export interface AnalysisResult {
   metrics: {
     nucleus_count: number;
     mean_area_px: number;
-    mean_uncertainty: number;
+    mean_tta_disagreement: number | null;
   };
   images: {
     overlay: string;
-    probability: string;
+    foreground_score: string;
     instances: string;
     distance: string;
-    uncertainty: string;
+    tta_disagreement: string | null;
   };
   measurements: NucleusMeasurement[];
   downloads: {
     csv: string;
     pdf: string;
+    provenance_json: string;
   };
 }
 

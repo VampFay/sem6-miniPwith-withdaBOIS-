@@ -140,13 +140,22 @@ export function UploadView({health, healthError, analysisError, onAnalyze, onRef
 
         <section>
           <div className="mb-2 flex items-center gap-2"><SlidersHorizontal className="h-4 w-4 text-blue-400" /><h2 className="text-sm font-bold text-zinc-300">Inference controls</h2></div>
-          <RangeControl label="Foreground threshold" value={options.maskThreshold} min={0.1} max={0.9} step={0.05} onChange={(value) => setOptions({...options, maskThreshold: value})} />
-          <RangeControl label="Watershed peak threshold" value={options.peakThreshold} min={0.1} max={0.9} step={0.05} onChange={(value) => setOptions({...options, peakThreshold: value})} />
-          <RangeControl label="Minimum nucleus area" value={options.minSize} min={1} max={100} step={1} onChange={(value) => setOptions({...options, minSize: value})} />
-          <label className="mt-4 flex items-center justify-between gap-4 rounded-md border border-white/8 bg-black/20 p-3">
-            <span><strong className="block text-xs text-zinc-300">Test-time augmentation</strong><small className="mt-1 block text-[10px] text-zinc-500">Four-view mask consensus</small></span>
-            <input className="h-4 w-4 accent-blue-500" type="checkbox" checked={options.useTta} onChange={(event) => setOptions({...options, useTta: event.target.checked})} />
-          </label>
+          {health?.operating_mode === 'controlled' ? (
+            <div className="mt-3 rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3">
+              <strong className="block text-xs text-emerald-200">Approved settings locked</strong>
+              <p className="mt-2 text-[10px] leading-4 text-zinc-500">The checkpoint's verified postprocessing settings are enforced by the API and cannot be overridden here.</p>
+            </div>
+          ) : (
+            <>
+              <RangeControl label="Foreground threshold" value={options.maskThreshold} min={0.1} max={0.9} step={0.05} onChange={(value) => setOptions({...options, maskThreshold: value})} />
+              <RangeControl label="Watershed peak threshold" value={options.peakThreshold} min={0.1} max={0.9} step={0.05} onChange={(value) => setOptions({...options, peakThreshold: value})} />
+              <RangeControl label="Minimum nucleus area" value={options.minSize} min={1} max={100} step={1} onChange={(value) => setOptions({...options, minSize: value})} />
+              <label className="mt-4 flex items-center justify-between gap-4 rounded-md border border-white/8 bg-black/20 p-3">
+                <span><strong className="block text-xs text-zinc-300">Test-time augmentation</strong><small className="mt-1 block text-[10px] text-zinc-500">Four-view mask consensus</small></span>
+                <input className="h-4 w-4 accent-blue-500" type="checkbox" checked={options.useTta} onChange={(event) => setOptions({...options, useTta: event.target.checked})} />
+              </label>
+            </>
+          )}
         </section>
       </aside>
 
@@ -189,7 +198,7 @@ export function UploadView({health, healthError, analysisError, onAnalyze, onRef
         </div>
 
         <footer className="relative z-10 m-4 flex flex-col gap-4 rounded-lg border border-white/10 bg-black/40 p-4 sm:flex-row sm:items-center sm:justify-between lg:m-6">
-          <div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-full border border-emerald-500/20 bg-emerald-500/10"><ShieldCheck className="h-5 w-5 text-emerald-400" /></div><div><strong className="text-sm text-white">Local research processing</strong><p className="mt-1 text-[10px] font-mono uppercase text-emerald-400/80">Requests stay on the configured local API</p></div></div>
+          <div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-full border border-emerald-500/20 bg-emerald-500/10"><ShieldCheck className="h-5 w-5 text-emerald-400" /></div><div><strong className="text-sm text-white">{health?.operating_mode === 'controlled' ? 'Controlled processing' : 'Local research processing'}</strong><p className="mt-1 text-[10px] font-mono uppercase text-emerald-400/80">Not cleared for diagnostic use</p></div></div>
           <div className="text-left sm:text-right"><div className="text-[10px] font-bold uppercase text-zinc-500">Runtime target</div><div className="mt-1 flex items-center gap-2 text-xs font-mono text-zinc-300 sm:justify-end">{health?.device === 'MPS' ? <Activity className="h-3.5 w-3.5 text-emerald-400" /> : <Cpu className="h-3.5 w-3.5 text-emerald-400" />}<span>{health?.device ?? 'Checking'}</span><span className="text-zinc-600">|</span><Gauge className="h-3.5 w-3.5 text-blue-400" /><span>{health?.checkpoint ?? 'No checkpoint'}</span></div></div>
         </footer>
       </section>

@@ -31,13 +31,12 @@ interface DashboardViewProps {
   onReset: () => void;
 }
 
-const VIEWS: Array<{id: ResultView; label: string; icon: typeof Eye}> = [
+const BASE_VIEWS: Array<{id: ResultView; label: string; icon: typeof Eye}> = [
   {id: 'source', label: 'Source', icon: FileImage},
   {id: 'overlay', label: 'Overlay', icon: Eye},
   {id: 'instances', label: 'Instances', icon: Layers3},
-  {id: 'probability', label: 'Probability', icon: ScanSearch},
+  {id: 'foreground_score', label: 'Foreground score', icon: ScanSearch},
   {id: 'distance', label: 'Distance', icon: Target},
-  {id: 'uncertainty', label: 'Uncertainty', icon: Gauge},
 ];
 
 function dataUrl(base64: string): string {
@@ -67,7 +66,14 @@ export function DashboardView({result, sourceUrl, caseId, fileName, health, onRe
   const [rotation, setRotation] = useState(0);
   const [dimensions, setDimensions] = useState('');
 
-  const viewSource = activeView === 'source' ? sourceUrl : dataUrl(result.images[activeView]);
+  const views = useMemo(
+    () => result.images.tta_disagreement
+      ? [...BASE_VIEWS, {id: 'tta_disagreement' as const, label: 'TTA disagreement', icon: Gauge}]
+      : BASE_VIEWS,
+    [result.images.tta_disagreement],
+  );
+  const encodedView = activeView === 'source' ? null : result.images[activeView];
+  const viewSource = encodedView ? dataUrl(encodedView) : sourceUrl;
   const areas = useMemo(() => result.measurements.map((row) => row.area_px), [result.measurements]);
   const perimeters = useMemo(() => result.measurements.map((row) => row.perimeter_px), [result.measurements]);
   const eccentricities = useMemo(() => result.measurements.map((row) => row.eccentricity), [result.measurements]);
@@ -83,13 +89,15 @@ export function DashboardView({result, sourceUrl, caseId, fileName, health, onRe
               <div className="flex justify-between gap-3"><dt className="text-zinc-500">CASE ID</dt><dd className="truncate text-zinc-300">{caseId}</dd></div>
               <div className="flex justify-between gap-3"><dt className="text-zinc-500">DEVICE</dt><dd className="text-zinc-300">{health?.device ?? 'LOCAL'}</dd></div>
               <div className="flex justify-between gap-3"><dt className="text-zinc-500">FILE</dt><dd className="max-w-28 truncate border-b border-blue-500/40 text-zinc-300">{fileName}</dd></div>
+              <div className="flex justify-between gap-3"><dt className="text-zinc-500">RELEASE</dt><dd className="max-w-28 truncate text-zinc-300">{result.provenance.release_id}</dd></div>
+              <div className="flex justify-between gap-3"><dt className="text-zinc-500">MODE</dt><dd className="text-zinc-300">{result.provenance.operating_mode.toUpperCase()}</dd></div>
             </dl>
           </section>
 
           <section className="mt-5">
             <div className="mb-2 flex items-center justify-between"><h2 className="text-[10px] font-bold uppercase text-zinc-500">Layer toolbox</h2><Settings className="h-3 w-3 text-zinc-600" /></div>
             <div className="space-y-1.5">
-              {VIEWS.map(({id, label, icon: Icon}) => (
+              {views.map(({id, label, icon: Icon}) => (
                 <button key={id} type="button" onClick={() => setActiveView(id)} className={cn('flex w-full items-center rounded border px-3 py-2 text-left transition-colors', activeView === id ? 'border-blue-500/50 bg-blue-600/20 text-blue-400' : 'border-white/10 bg-[#1c1d22] text-zinc-400 hover:bg-[#25262c] hover:text-white')}><Icon className="mr-3 h-4 w-4" /><span className="text-[11px] font-bold uppercase">{label}</span></button>
               ))}
             </div>
@@ -114,7 +122,7 @@ export function DashboardView({result, sourceUrl, caseId, fileName, health, onRe
 
         <main className="relative min-h-[66vh] flex-1 overflow-hidden bg-black xl:min-h-0">
           <div className="absolute left-4 top-4 z-20 flex items-center gap-1 rounded-md border border-white/10 bg-[#121317]/95 p-1 shadow-xl">
-            <span className="flex items-center gap-2 px-2 font-mono text-[10px] font-bold uppercase text-zinc-300"><Activity className="h-3.5 w-3.5 text-blue-500" />{VIEWS.find((view) => view.id === activeView)?.label}</span>
+            <span className="flex items-center gap-2 px-2 font-mono text-[10px] font-bold uppercase text-zinc-300"><Activity className="h-3.5 w-3.5 text-blue-500" />{views.find((view) => view.id === activeView)?.label}</span>
             <span className="mx-1 h-5 w-px bg-white/10" />
             <button className="grid h-7 w-7 place-items-center rounded text-zinc-400 hover:bg-white/5 hover:text-white" type="button" title="Reset view" onClick={() => { setZoom(1); setRotation(0); }}><Focus className="h-4 w-4" /></button>
             <button className="grid h-7 w-7 place-items-center rounded text-zinc-400 hover:bg-white/5 hover:text-white" type="button" title="Rotate image" onClick={() => setRotation((value) => (value + 90) % 360)}><RotateCcw className="h-4 w-4" /></button>
@@ -130,9 +138,9 @@ export function DashboardView({result, sourceUrl, caseId, fileName, health, onRe
             <h2 className="border-b border-white/10 pb-2 text-[10px] font-bold uppercase text-zinc-300">Output layers</h2>
             <div className="mt-2 space-y-2 font-mono text-[9px] font-bold uppercase">
               <button className="flex w-full items-center text-blue-300" type="button" onClick={() => setActiveView('overlay')}><span className="mr-2 h-2 w-2 rounded-sm bg-blue-500" />Instance overlay</button>
-              <button className="flex w-full items-center text-fuchsia-300" type="button" onClick={() => setActiveView('probability')}><span className="mr-2 h-2 w-2 rounded-sm bg-fuchsia-500" />Mask probability</button>
+              <button className="flex w-full items-center text-fuchsia-300" type="button" onClick={() => setActiveView('foreground_score')}><span className="mr-2 h-2 w-2 rounded-sm bg-fuchsia-500" />Foreground score</button>
               <button className="flex w-full items-center text-amber-200" type="button" onClick={() => setActiveView('distance')}><span className="mr-2 h-2 w-2 rounded-sm bg-amber-400" />Distance map</button>
-              <button className="flex w-full items-center text-emerald-200" type="button" onClick={() => setActiveView('uncertainty')}><span className="mr-2 h-2 w-2 rounded-sm bg-emerald-400" />Uncertainty</button>
+              {result.images.tta_disagreement && <button className="flex w-full items-center text-emerald-200" type="button" onClick={() => setActiveView('tta_disagreement')}><span className="mr-2 h-2 w-2 rounded-sm bg-emerald-400" />TTA disagreement</button>}
             </div>
           </div>
 
@@ -158,10 +166,10 @@ export function DashboardView({result, sourceUrl, caseId, fileName, health, onRe
           <section className="overflow-hidden rounded-md border border-white/10 bg-[#121317]">
             <header className="flex items-center justify-between border-b border-white/10 px-3 py-2"><h2 className="text-[10px] font-bold uppercase text-zinc-400">Segmentation results</h2><ScanSearch className="h-3.5 w-3.5 text-blue-400" /></header>
             <div className="bg-[#191a20] p-3">
-              <div className="flex items-end justify-between"><div><span className="text-[9px] font-bold uppercase text-zinc-500">Detected nuclei</span><strong className="mt-1 block font-mono text-3xl text-white">{result.metrics.nucleus_count.toLocaleString()}</strong></div><span className="font-mono text-[9px] uppercase text-zinc-600">Research output</span></div>
+              <div className="flex items-end justify-between"><div><span className="text-[9px] font-bold uppercase text-zinc-500">Segmented objects</span><strong className="mt-1 block font-mono text-3xl text-white">{result.metrics.nucleus_count.toLocaleString()}</strong></div><span className="font-mono text-[9px] uppercase text-zinc-600">Not diagnostic</span></div>
               <dl className="mt-4 grid grid-cols-2 gap-2">
                 <div className="rounded border border-white/5 bg-black/20 p-2"><dt className="text-[9px] uppercase text-zinc-600">Mean area</dt><dd className="mt-1 font-mono text-xs text-zinc-300">{result.metrics.mean_area_px.toFixed(2)} px^2</dd></div>
-                <div className="rounded border border-white/5 bg-black/20 p-2"><dt className="text-[9px] uppercase text-zinc-600">Mean uncertainty</dt><dd className="mt-1 font-mono text-xs text-zinc-300">{result.metrics.mean_uncertainty.toFixed(5)}</dd></div>
+                <div className="rounded border border-white/5 bg-black/20 p-2"><dt className="text-[9px] uppercase text-zinc-600">TTA disagreement</dt><dd className="mt-1 font-mono text-xs text-zinc-300">{result.metrics.mean_tta_disagreement === null ? 'Not calculated' : result.metrics.mean_tta_disagreement.toFixed(5)}</dd></div>
               </dl>
             </div>
           </section>
@@ -186,14 +194,14 @@ export function DashboardView({result, sourceUrl, caseId, fileName, health, onRe
             </div>
           </section>
 
-          <section className="overflow-hidden rounded-md border border-white/10 bg-[#121317]">
-            <header className="flex items-center justify-between border-b border-white/10 px-3 py-2"><h2 className="text-[10px] font-bold uppercase text-zinc-400">Uncertainty map</h2><Gauge className="h-3.5 w-3.5 text-zinc-600" /></header>
-            <button className="block w-full bg-black p-3 text-left" type="button" onClick={() => setActiveView('uncertainty')}><img className="h-28 w-full object-contain" src={dataUrl(result.images.uncertainty)} alt="Model uncertainty map" /><span className="mt-2 block text-[9px] font-mono uppercase text-zinc-600">TTA mask standard deviation</span></button>
-          </section>
+          {result.images.tta_disagreement && <section className="overflow-hidden rounded-md border border-white/10 bg-[#121317]">
+            <header className="flex items-center justify-between border-b border-white/10 px-3 py-2"><h2 className="text-[10px] font-bold uppercase text-zinc-400">TTA disagreement map</h2><Gauge className="h-3.5 w-3.5 text-zinc-600" /></header>
+            <button className="block w-full bg-black p-3 text-left" type="button" onClick={() => setActiveView('tta_disagreement')}><img className="h-28 w-full object-contain" src={dataUrl(result.images.tta_disagreement)} alt="TTA mask disagreement map" /><span className="mt-2 block text-[9px] font-mono uppercase text-zinc-600">Standard deviation across augmented views; not calibrated uncertainty</span></button>
+          </section>}
 
           <section className="mb-4 overflow-hidden rounded-md border border-white/10 bg-[#121317]">
             <header className="border-b border-white/10 px-3 py-2"><h2 className="text-[10px] font-bold uppercase text-zinc-400">Report generation</h2></header>
-            <div className="flex gap-3 p-3"><button className="flex flex-1 items-center justify-center gap-2 rounded border border-white/10 bg-[#1c1d22] px-3 py-2 text-[10px] font-bold uppercase text-zinc-300 hover:bg-[#25262c]" type="button" onClick={() => downloadBase64(result.downloads.csv, 'text/csv', `${exportPrefix}-measurements.csv`)}><Download className="h-3.5 w-3.5" />Export CSV</button><button className="flex flex-1 items-center justify-center gap-2 rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-[10px] font-bold uppercase text-white hover:bg-zinc-700" type="button" onClick={() => downloadBase64(result.downloads.pdf, 'application/pdf', `${exportPrefix}-report.pdf`)}><FileText className="h-3.5 w-3.5" />Report PDF</button></div>
+            <div className="grid grid-cols-3 gap-2 p-3"><button className="flex items-center justify-center gap-2 rounded border border-white/10 bg-[#1c1d22] px-2 py-2 text-[9px] font-bold uppercase text-zinc-300 hover:bg-[#25262c]" type="button" onClick={() => downloadBase64(result.downloads.csv, 'text/csv', `${exportPrefix}-measurements.csv`)}><Download className="h-3.5 w-3.5" />CSV</button><button className="flex items-center justify-center gap-2 rounded border border-zinc-700 bg-zinc-800 px-2 py-2 text-[9px] font-bold uppercase text-white hover:bg-zinc-700" type="button" onClick={() => downloadBase64(result.downloads.pdf, 'application/pdf', `${exportPrefix}-report.pdf`)}><FileText className="h-3.5 w-3.5" />PDF</button><button className="flex items-center justify-center gap-2 rounded border border-white/10 bg-[#1c1d22] px-2 py-2 text-[9px] font-bold uppercase text-zinc-300 hover:bg-[#25262c]" type="button" onClick={() => downloadBase64(result.downloads.provenance_json, 'application/json', `${exportPrefix}-provenance.json`)}><Download className="h-3.5 w-3.5" />Proof</button></div>
           </section>
         </aside>
       </div>

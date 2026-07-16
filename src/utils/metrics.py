@@ -17,6 +17,7 @@ class BinaryMetrics:
 @dataclass(frozen=True)
 class InstanceMetrics:
     aji: float
+    aji_plus: float
     pq: float
     detection_f1: float
     segmentation_quality: float
@@ -98,6 +99,33 @@ def _aji_from_overlaps(
         return 1.0
     if not len(true_areas) or not len(pred_areas):
         return 0.0
+
+    intersection_sum = 0.0
+    union_sum = 0.0
+    matched_columns: set[int] = set()
+    for row in range(len(true_areas)):
+        column = int(np.argmax(iou[row]))
+        if intersections[row, column] == 0:
+            union_sum += true_areas[row]
+            continue
+        intersection_sum += intersections[row, column]
+        union_sum += unions[row, column]
+        matched_columns.add(column)
+    union_sum += sum(area for index, area in enumerate(pred_areas) if index not in matched_columns)
+    return float(intersection_sum / union_sum) if union_sum else 1.0
+
+
+def _aji_plus_from_overlaps(
+    intersections: np.ndarray,
+    unions: np.ndarray,
+    true_areas: np.ndarray,
+    pred_areas: np.ndarray,
+    iou: np.ndarray,
+) -> float:
+    if not len(true_areas) and not len(pred_areas):
+        return 1.0
+    if not len(true_areas) or not len(pred_areas):
+        return 0.0
     rows, columns = linear_sum_assignment(-iou)
     matched = [
         (row, column) for row, column in zip(rows, columns, strict=True) if iou[row, column]
@@ -116,6 +144,11 @@ def calculate_aji(gt_instances: np.ndarray, pred_instances: np.ndarray) -> float
     return _aji_from_overlaps(*overlaps)
 
 
+def calculate_aji_plus(gt_instances: np.ndarray, pred_instances: np.ndarray) -> float:
+    overlaps = _overlap_table(gt_instances, pred_instances)
+    return _aji_plus_from_overlaps(*overlaps)
+
+
 def calculate_instance_metrics(
     gt_instances: np.ndarray, pred_instances: np.ndarray, match_iou: float = 0.5
 ) -> InstanceMetrics:
@@ -125,12 +158,12 @@ def calculate_instance_metrics(
         gt_instances, pred_instances
     )
     if not len(true_areas) and not len(pred_areas):
-        return InstanceMetrics(1.0, 1.0, 1.0, 1.0, 1.0)
+        return InstanceMetrics(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)
     rows, columns = linear_sum_assignment(-iou) if iou.size else (np.array([]), np.array([]))
     matched_ious = [
         iou[row, column]
         for row, column in zip(rows, columns, strict=True)
-        if iou[row, column] >= match_iou
+        if iou[row, column] > match_iou
     ]
     true_positive = len(matched_ious)
     false_positive = len(pred_areas) - true_positive
@@ -142,6 +175,7 @@ def calculate_instance_metrics(
     detection_f1 = 2 * true_positive / detection_denominator if detection_denominator else 1.0
     return InstanceMetrics(
         aji=_aji_from_overlaps(intersections, unions, true_areas, pred_areas, iou),
+        aji_plus=_aji_plus_from_overlaps(intersections, unions, true_areas, pred_areas, iou),
         pq=segmentation_quality * recognition_quality,
         detection_f1=detection_f1,
         segmentation_quality=segmentation_quality,

@@ -45,6 +45,40 @@ def test_postprocessing_handles_empty_prediction() -> None:
     assert np.count_nonzero(postprocess_instances(empty, empty)) == 0
 
 
+def test_postprocessing_retains_every_disconnected_foreground_component() -> None:
+    foreground = np.zeros((16, 32), dtype=np.float32)
+    distance = np.zeros_like(foreground)
+    foreground[2:8, 2:8] = 1
+    foreground[2:8, 22:28] = 1
+    distance[3:7, 3:7] = 0.8
+    distance[3:7, 23:27] = 0.2
+
+    instances = postprocess_instances(
+        foreground,
+        distance,
+        peak_threshold=0.35,
+        min_size=1,
+        gaussian_sigma=0,
+        peak_window_size=3,
+    )
+
+    assert np.all(instances[foreground > 0] > 0)
+    assert set(np.unique(instances)) == {0, 1, 2}
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"min_size": 0},
+        {"gaussian_sigma": -0.1},
+        {"peak_window_size": 2},
+    ],
+)
+def test_postprocessing_rejects_invalid_geometry(kwargs: dict[str, float | int]) -> None:
+    with pytest.raises(ValueError):
+        PostprocessConfig(**kwargs)
+
+
 def test_tensor_conversion_accepts_read_only_memory_map_views() -> None:
     image = np.zeros((16, 16, 3), dtype=np.uint8)
     image.setflags(write=False)
@@ -69,7 +103,7 @@ def test_tta_batches_all_views_in_one_equivariant_model_call() -> None:
     assert model.calls == 1
     np.testing.assert_allclose(augmented["mask"], reference["mask"], atol=1e-6)
     np.testing.assert_allclose(augmented["dist_map"], reference["dist_map"], atol=1e-6)
-    assert float(augmented["uncertainty"].max()) < 1e-6
+    assert float(augmented["tta_disagreement"].max()) < 1e-6
 
 
 @pytest.mark.parametrize(
@@ -88,6 +122,100 @@ def test_inference_applies_declared_distance_activation(
     result = engine.predict_maps(image)
 
     assert float(result["dist_map"].mean()) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(
+    ("length", "tile_size", "step", "expected"),
+    [
+        (16, 32, 24, [0]),
+        (32, 32, 24, [0]),
+        (64, 32, 24, [0, 24, 32]),
+        (83, 32, 24, [0, 24, 48, 51]),
+    ],
+)
+def test_tile_starts_cover_borders_without_duplicate_terminal_tile(
+    length: int, tile_size: int, step: int, expected: list[int]
+) -> None:
+    assert AttnDistInference._starts(length, tile_size, step) == expected
+
+
+def test_tiled_blending_preserves_constant_maps_across_seams(monkeypatch) -> None:
+    engine = AttnDistInference(ZeroDistanceModel(), "cpu", tile_size=32, overlap=8)
+    calls: list[tuple[int, int]] = []
+
+    def constant_patch(image: np.ndarray, use_tta: bool) -> tuple[np.ndarray, ...]:
+        assert use_tta
+        calls.append(image.shape[:2])
+        shape = image.shape[:2]
+        return (
+            np.full(shape, 0.25, dtype=np.float32),
+            np.full(shape, 0.75, dtype=np.float32),
+            np.full(shape, 0.10, dtype=np.float32),
+        )
+
+    monkeypatch.setattr(engine, "_predict_patch", constant_patch)
+    result = engine.predict_maps(np.zeros((70, 83, 3), dtype=np.uint8), use_tta=True)
+
+    assert len(calls) == 12
+    assert set(calls) == {(32, 32)}
+    assert all(value.shape == (70, 83) for value in result.values())
+    np.testing.assert_allclose(result["mask"], 0.25, atol=1e-6)
+    np.testing.assert_allclose(result["dist_map"], 0.75, atol=1e-6)
+    np.testing.assert_allclose(result["tta_disagreement"], 0.10, atol=1e-6)
+
+
+def test_predict_full_applies_explicit_postprocessing_overrides(monkeypatch) -> None:
+    engine = AttnDistInference(
+        ZeroDistanceModel(),
+        "cpu",
+        postprocess=PostprocessConfig(
+            mask_threshold=0.5,
+            peak_threshold=0.35,
+            min_size=10,
+            gaussian_sigma=1.0,
+            peak_window_size=7,
+        ),
+    )
+    maps = {
+        "mask": np.full((8, 8), 0.8, dtype=np.float32),
+        "dist_map": np.full((8, 8), 0.6, dtype=np.float32),
+        "tta_disagreement": np.full((8, 8), 0.1, dtype=np.float32),
+    }
+    captured: tuple[object, ...] | None = None
+
+    def capture(*args):
+        nonlocal captured
+        captured = args
+        return np.ones((8, 8), dtype=np.int32)
+
+    monkeypatch.setattr(engine, "predict_maps", lambda image, use_tta: maps)
+    monkeypatch.setattr(predictor_module, "postprocess_instances", capture)
+    result = engine.predict_full(
+        np.zeros((8, 8, 3), dtype=np.uint8),
+        mask_threshold=0.6,
+        peak_threshold=0.4,
+        min_size=4,
+        gaussian_sigma=0.5,
+        peak_window_size=5,
+    )
+
+    assert captured is not None
+    assert captured[0] is maps["mask"]
+    assert captured[1] is maps["dist_map"]
+    assert captured[2:] == (0.6, 0.4, 4, 0.5, 5)
+    assert np.all(result["instances"] == 1)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"format_version": 1, "artifact_type": "attn-dist-inference"},
+        {"format_version": 2, "artifact_type": "attn-dist-training"},
+    ],
+)
+def test_inference_rejects_wrong_artifact_contract(payload: dict[str, object]) -> None:
+    with pytest.raises(ValueError):
+        AttnDistInference._from_checkpoint_payload(payload, "cpu", "test")
 
 
 @pytest.mark.parametrize(

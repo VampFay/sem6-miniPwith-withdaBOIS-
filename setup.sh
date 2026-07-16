@@ -76,7 +76,7 @@ ensure_environment() {
   if [[ "$current_stamp" != "$saved_stamp" ]]; then
     info "Installing project dependencies"
     PIP_DISABLE_PIP_VERSION_CHECK=1 "$PYTHON" -m pip install --no-cache-dir --upgrade pip setuptools wheel
-    (cd "$ROOT" && PIP_DISABLE_PIP_VERSION_CHECK=1 "$PYTHON" -m pip install --no-cache-dir -e '.[dev]')
+    (cd "$ROOT" && PIP_DISABLE_PIP_VERSION_CHECK=1 "$PYTHON" -m pip install --no-cache-dir -e '.[dev,train]')
     printf '%s\n' "$current_stamp" > "$STAMP_FILE"
   else
     info "Dependencies are current"
@@ -199,7 +199,7 @@ prepare_data() {
   ensure_environment
   (cd "$ROOT" && "$PYTHON" -m scripts.prepare_pannuke "${@:2}" --preflight)
   info "Installing dataset preparation support"
-  (cd "$ROOT" && PIP_DISABLE_PIP_VERSION_CHECK=1 "$PYTHON" -m pip install --no-cache-dir -e '.[data]')
+  (cd "$ROOT" && PIP_DISABLE_PIP_VERSION_CHECK=1 "$PYTHON" -m pip install --no-cache-dir -e '.[data,train]')
   cd "$ROOT"
   exec "$PYTHON" -m scripts.prepare_pannuke "${@:2}"
 }
@@ -212,7 +212,9 @@ check_project() {
   info "Running Ruff"
   (cd "$ROOT" && "$PYTHON" -m ruff check src tests train.py evaluate.py api.py scripts)
   info "Running mypy"
-  (cd "$ROOT" && "$PYTHON" -m mypy src train.py evaluate.py api.py scripts)
+  (cd "$ROOT" && "$PYTHON" -m mypy \
+    --cache-dir="${ATTNDIST_MYPY_CACHE_DIR:-$ROOT/.mypy_cache}" \
+    src train.py evaluate.py api.py scripts)
   info "Running tests"
   (cd "$ROOT" && MPLBACKEND=Agg "$PYTHON" -m pytest -p no:cacheprovider -q)
   info "Type-checking web interface"
@@ -386,12 +388,17 @@ Commands:
   training-status       Show background training state and recent output
   evaluate [path] [...] Evaluate a checkpoint, auto-discovering it when omitted
   tune [path] [...]     Tune postprocessing on validation fold 2 only
+  release-gate          Fail closed unless evidence and controlled runtime are approved
+  sbom [path]           Generate audited CycloneDX runtime SBOM and hash receipt
+  load-test [...]       Run bounded API load qualification with explicit acceptance limits
   all                   Run checks, validate data when present, then start the app
   help                  Show this message
 
 Environment overrides:
   PYTHON_BIN, ATTNDIST_VENV_DIR, ATTNDIST_DATA_DIR, ATTNDIST_OUTPUT_DIR
   ATTNDIST_API_PORT, ATTNDIST_UI_PORT, ATTNDIST_CHECKPOINT
+  ATTNDIST_OPERATING_MODE, ATTNDIST_RELEASE_ID, ATTNDIST_APPROVED_CHECKPOINT_SHA256
+  ATTNDIST_AUDIT_DIR, ATTNDIST_API_TOKEN, ATTNDIST_SBOM_RECEIPT
 EOF
 }
 
@@ -411,6 +418,22 @@ case "$command" in
   training-status) training_status ;;
   evaluate) evaluate_model "$@" ;;
   tune) tune_postprocessing "$@" ;;
+  release-gate)
+    ensure_environment
+    cd "$ROOT"
+    exec "$PYTHON" -m scripts.release_gate --runtime
+    ;;
+  sbom)
+    ensure_environment
+    cd "$ROOT"
+    exec "$PYTHON" -m scripts.generate_sbom \
+      --output "${2:-outputs_v2/release/sbom.cdx.json}" --overwrite
+    ;;
+  load-test)
+    ensure_environment
+    cd "$ROOT"
+    exec "$PYTHON" -m scripts.load_test "${@:2}"
+    ;;
   all)
     check_project
     doctor

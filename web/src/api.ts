@@ -16,15 +16,18 @@ export async function analyzeImage(
   analysisId: string,
   file: File,
   options: AnalysisOptions,
+  operatingMode: HealthStatus['operating_mode'],
   signal?: AbortSignal,
 ): Promise<AnalysisResult> {
   const data = new FormData();
   data.append('analysis_id', analysisId);
   data.append('file', file);
-  data.append('use_tta', String(options.useTta));
-  data.append('mask_threshold', String(options.maskThreshold));
-  data.append('peak_threshold', String(options.peakThreshold));
-  data.append('min_size', String(options.minSize));
+  if (operatingMode === 'research') {
+    data.append('use_tta', String(options.useTta));
+    data.append('mask_threshold', String(options.maskThreshold));
+    data.append('peak_threshold', String(options.peakThreshold));
+    data.append('min_size', String(options.minSize));
+  }
   return responseJson<AnalysisResult>(
     await fetch('/api/analyze', {method: 'POST', body: data, signal}),
   );

@@ -3,10 +3,12 @@ from __future__ import annotations
 import csv
 import hashlib
 import logging
+import os
+import tempfile
 from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import torch
@@ -150,8 +152,12 @@ class Trainer:
         )
 
     def checkpoint_state(self, epoch: int) -> dict[str, Any]:
+        numpy_rng_state = cast(
+            tuple[str, np.ndarray[Any, np.dtype[np.uint32]], int, int, float],
+            np.random.get_state(legacy=True),
+        )
         return {
-            "format_version": 2,
+            "format_version": 3,
             "artifact_type": "attn-dist-training",
             "epoch": epoch,
             "model_state_dict": self.model.state_dict(),
@@ -162,14 +168,38 @@ class Trainer:
             "stale_epochs": self.stale_epochs,
             "config": self.config.as_serializable_dict(),
             "torch_rng_state": torch.get_rng_state(),
-            "numpy_rng_state": np.random.get_state(),
+            # Keep the resume artifact compatible with torch.load(weights_only=True).
+            # NumPy's native RNG tuple contains an ndarray that requires unsafe pickle
+            # globals; a tensor plus primitives preserves the state without them.
+            "numpy_rng_state": {
+                "bit_generator": str(numpy_rng_state[0]),
+                "state": torch.from_numpy(numpy_rng_state[1].copy()),
+                "position": int(numpy_rng_state[2]),
+                "has_gauss": int(numpy_rng_state[3]),
+                "cached_gaussian": float(numpy_rng_state[4]),
+            },
         }
 
     @staticmethod
     def _save_state(path: Path, state: dict[str, Any]) -> None:
-        temporary = path.with_suffix(path.suffix + ".tmp")
-        torch.save(state, temporary)
-        temporary.replace(path)
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+        )
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(descriptor, "wb") as stream:
+                torch.save(state, stream)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, path)
+            directory_descriptor = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory_descriptor)
+            finally:
+                os.close(directory_descriptor)
+        except BaseException:
+            temporary.unlink(missing_ok=True)
+            raise
 
     def save_training_checkpoint(self, path: Path, epoch: int) -> None:
         self._save_state(path, self.checkpoint_state(epoch))
@@ -218,8 +248,8 @@ class Trainer:
     def resume(self, path: Path) -> None:
         # RNG state is always a CPU ByteTensor. Loading the complete training
         # state onto MPS makes torch.set_rng_state reject that tensor.
-        checkpoint = torch.load(path, map_location="cpu", weights_only=False)
-        if checkpoint.get("format_version") != 2:
+        checkpoint = torch.load(path, map_location="cpu", weights_only=True)
+        if checkpoint.get("format_version") != 3:
             raise ValueError(f"Unsupported checkpoint format: {checkpoint.get('format_version')}")
         if checkpoint.get("artifact_type") != "attn-dist-training":
             raise ValueError("Resume requires a training checkpoint, not an inference artifact")
@@ -231,7 +261,23 @@ class Trainer:
         self.best_iou = float(checkpoint["best_iou"])
         self.stale_epochs = int(checkpoint.get("stale_epochs", 0))
         torch.set_rng_state(checkpoint["torch_rng_state"])
-        np.random.set_state(checkpoint["numpy_rng_state"])
+        numpy_rng_state = checkpoint.get("numpy_rng_state")
+        if not isinstance(numpy_rng_state, dict):
+            raise ValueError("Training checkpoint has an invalid NumPy RNG state")
+        state_tensor = numpy_rng_state.get("state")
+        if not isinstance(state_tensor, torch.Tensor):
+            raise ValueError("Training checkpoint has an invalid NumPy RNG tensor")
+        try:
+            restored_numpy_state = (
+                str(numpy_rng_state["bit_generator"]),
+                state_tensor.detach().cpu().numpy().astype(np.uint32, copy=False),
+                int(numpy_rng_state["position"]),
+                int(numpy_rng_state["has_gauss"]),
+                float(numpy_rng_state["cached_gaussian"]),
+            )
+            np.random.set_state(restored_numpy_state)
+        except (KeyError, TypeError, ValueError) as error:
+            raise ValueError("Training checkpoint has an invalid NumPy RNG state") from error
 
     def _record(self, epoch: int, train: EpochResult, validation: EpochResult) -> None:
         values = {

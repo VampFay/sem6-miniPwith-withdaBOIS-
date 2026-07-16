@@ -23,7 +23,7 @@ production defaults.
 - Dataset manifest: `dbca4c3fb948cd0b23edcef8d56bbf489ecdba212480ad5b82833689cd1ded9f`
 - Development split: all 2,523 PanNuke fold-2 images
 - Coarse-selection subset: 384 deterministic images, seed 42
-- Selection metric: mean per-image PQ, then detection F1 and AJI
+- Selection metric: mean per-image PQ, then detection F1 and AJI+
 - Fold-3 access: none
 - Calibrated checkpoint: `fde326a483d9cbb63b1f698b21ff5a9eecd2798f2571dbdc4b4afa7fd3704262`
 
@@ -51,7 +51,7 @@ invalidated the earlier partial optima.
 | Metric | Original postprocessing | Calibrated | Absolute change |
 | --- | ---: | ---: | ---: |
 | Dice | 0.82150 | 0.82085 | -0.00065 |
-| AJI | 0.48641 | 0.62915 | +0.14274 |
+| AJI+ | 0.48641 | 0.62915 | +0.14274 |
 | PQ | 0.40436 | 0.60285 | +0.19849 |
 | Detection F1 | 0.52719 | 0.74306 | +0.21587 |
 | Segmentation quality | 0.73549 | 0.79039 | +0.05490 |
@@ -64,6 +64,10 @@ The complete final-stage leaderboard and cache identity are in
 [e01_postprocessing_validation.json](results/e01_postprocessing_validation.json). This remains
 development evidence, not a new held-out test result. Fold 3 stays quarantined until a
 predeclared final model candidate completes the remaining roadmap.
+
+The historical search used the then-current `IoU >= 0.5` PQ implementation. It is valid as a
+record of development choices, but the selected configuration must be reconfirmed with the
+corrected strict-match evaluator before a controlled release.
 
 ## Reproduction
 
