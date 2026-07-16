@@ -1,0 +1,14 @@
+standard_or_guidance,topic,proposed_application,edition_to_confirm,conformity_status,owner
+ISO 13485,quality management system,full lifecycle QMS,2016 as incorporated by FDA QMSR,not implemented,quality-manager-unassigned
+ISO 14971,risk management,product risk-management file,2019 and applicable amendment,working draft only,clinical-safety-unassigned
+IEC 62304,medical-device software lifecycle,software safety classification and lifecycle processes,2006+A1:2015 or market-recognized edition,partial engineering evidence only,software-lead-unassigned
+IEC 62366-1,usability engineering,human-factors file,2015+A1:2020 or market-recognized edition,not executed,usability-lead-unassigned
+IEC 81001-5-1,health software cybersecurity,secure product lifecycle,2021 or market-recognized edition,partial controls only,security-lead-unassigned
+IEC 82304-1,health software product safety,product-level validation and information,2016 or market-recognized edition,not assessed,regulatory-lead-unassigned
+ISO 14155,clinical investigations,apply if clinical investigation design falls in scope,2020 or market-recognized edition,not assessed,clinical-lead-unassigned
+IMDRF SaMD N41,clinical evaluation,valid clinical association analytical and clinical validation,2017,plan only,clinical-lead-unassigned
+FDA QMSR 21 CFR Part 820,US QMS,US commercial distribution,current effective 2026-02-02,not implemented,quality-manager-unassigned
+FDA Cybersecurity Guidance,US cyber-device evidence,premarket and lifecycle cybersecurity,February 2026,partial controls only,security-lead-unassigned
+MDCG 2019-11 rev.1,EU software qualification and classification,MDR or IVDR decision,June 2025,not assessed,regulatory-lead-unassigned
+Regulation EU 2024/1689,EU AI obligations,high-risk applicability and integrated conformity assessment,current consolidated text,not assessed,regulatory-lead-unassigned
+CDSCO Medical Devices Rules 2017,India authorization,classification licensing QMS labeling vigilance,current amended text,not assessed,regulatory-lead-unassigned

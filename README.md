@@ -57,7 +57,7 @@ flowchart LR
 ## Local Setup
 
 Python 3.10-3.13 and Node.js 20 or newer are supported. Python 3.11 and 3.12, plus Node.js 22,
-are exercised in CI; the minimal production runtime uses Python 3.11.
+are exercised in CI; the minimal production runtime uses Python 3.12.
 
 ```bash
 chmod +x setup.sh

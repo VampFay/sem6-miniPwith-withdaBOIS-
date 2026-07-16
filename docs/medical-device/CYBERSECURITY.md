@@ -13,10 +13,11 @@ filesystem and bounded temporary storage. Audit storage is separate, access cont
 retention governed, and exported to an independently protected log service; the local hash chain
 detects alteration but is not a substitute for an external immutable anchor.
 
-The production stage is pinned to the non-root distroless Debian 12 Python image and contains no
-shell or package manager. Dependencies are installed from the hash lock in a separate pinned build
-stage and copied into the runtime. This reduces attack surface but does not waive image scanning,
-SBOM review, native-library testing, or vulnerability disposition for every frozen release.
+The production candidate is pinned to an immutable Wolfi base and exact Python 3.12 package version,
+runs non-root as UID/GID 65532, and removes the runtime shell and package manager. Dependencies are
+installed from the hash lock in a separate pinned build stage and copied into the runtime. This
+reduces attack surface but does not waive clean image scanning, SBOM review, native-library testing,
+or vulnerability disposition for every frozen release.
 
 ## Required release controls
 

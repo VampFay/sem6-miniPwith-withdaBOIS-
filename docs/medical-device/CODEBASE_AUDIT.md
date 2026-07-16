@@ -25,12 +25,12 @@ certificate. Ratings use 10 as “credible release evidence exists for the state
 | Audit/provenance | 8/10 | Input/model hashes, release/settings/device provenance and durable sequenced/hash-chained records with process locking, persisted-head truncation detection, and readiness checks. | Qualified durable/WORM retention, backup/restore, external head anchoring, multi-system reconciliation and audit review SOP. |
 | Output semantics and reports | 8/10 | “Foreground score” and “TTA disagreement” replace diagnostic probability/uncertainty claims; no-TTA omits disagreement; reports carry provenance and disclaimers. | Summative comprehension/usability validation and regulator-approved labeling. |
 | Architecture/maintainability | 8/10 | Analysis orchestration, postprocessing, validation, runtime and provenance have focused modules; API is a boundary layer; no generated dead-code paths were added. | Independent design review, long-term ownership and controlled anomaly/change process. |
-| Automated verification | 7/10 | 95 tests pass; Ruff, mypy, shell, TypeScript and production build pass; aggregate coverage is 83.86% against an enforced 80% gate. Tiled inference is 94% covered with border/seam invariants. | Independent property/fuzz/end-to-end/soak/fault-injection evidence; training orchestration remains below desired safety-critical depth. |
+| Automated verification | 7/10 | 102 tests pass; Ruff, mypy, shell, medical-evidence validation, TypeScript and production build pass; aggregate coverage is 83.79% against an enforced 80% gate. Tiled inference is 94% covered with border/seam invariants. | Independent property/fuzz/end-to-end/soak/fault-injection evidence; training orchestration remains below desired safety-critical depth. |
 | Dependency/supply chain | 8/10 | Hash-locked runtime, CPU-only Linux Torch source, immutable CI/base-image/scanner pins, non-root image, Python SBOM/hash receipt, and configured CodeQL plus Trivy image/configuration/secret gates with retained container CycloneDX; Python/npm audits report zero known vulnerabilities at audit time. | Execute and independently review frozen-commit SAST/container evidence; SBOM signing, license scan, supplier qualification, recurring monitoring and vulnerability disposition. |
 | Deployment/operations | 5/10 | Reproducible CPU image, health/readiness split, load harness, locked settings and documented gateway/read-only topology. | Production infrastructure, GPU image if used, IQ/OQ/PQ, capacity/soak, monitoring, backup/rollback and disaster exercises per site. |
 | Clinical evidence | 1/10 | A study framework exists; no repository evidence establishes clinical performance or utility. | Independent multi-site retrospective and prospective studies under approved protocols, plus reader/utility study if claimed. |
 | Usability/human factors | 1/10 | Safer terminology and workflow constraints are implemented; no representative-user validation exists. | Formative and summative studies with oncologists/pathologists/laboratory staff. |
-| QMS/regulatory/privacy/postmarket | 1/10 | Templates and fail-closed gates exist; accountable owners, operating records, approvals and authorizations do not. | Operational QMS, market strategy/authorization, privacy agreements/DPIA, labeling, complaints/vigilance/CAPA readiness. |
+| QMS/regulatory/privacy/postmarket | 2/10 | Controlled draft manuals, procedures, protocols, registers, a document index and fail-closed evidence checks exist; accountable owners, operating records, approvals and authorizations do not. | Operational QMS, market strategy/authorization, privacy agreements/DPIA, labeling, complaints/vigilance/CAPA readiness. |
 
 **Overall research/development software readiness: 8/10.**
 **Overall medical deployment readiness: 2/10 and release blocked.** The latter cannot increase from
@@ -89,10 +89,10 @@ repository work alone.
 
 ## Verification evidence from this audit
 
-- Repository verification components: 95 tests pass; Ruff, mypy over 34 source files, shell
-  validation, TypeScript
+- Repository verification components: 102 tests pass; Ruff, mypy over 37 source files, shell and
+  medical-evidence validation, TypeScript
   typecheck and the production UI build pass.
-- Coverage: 83.86% against an enforced 80% aggregate CI threshold; tiled inference is 94%, audit
+- Coverage: 83.79% against an enforced 80% aggregate CI threshold; tiled inference is 94%, audit
   provenance 93%, request limiting 94%, runtime configuration 97%, and image validation 92%.
 - Python dependency audit: no known vulnerabilities found; the local project itself is not a PyPI
   package and is reviewed as source.
@@ -103,16 +103,21 @@ repository work alone.
 - Container security: a checksum-verified Trivy 0.70.0 developer scan rejected both the prior
   Debian 13 slim runtime (22 high/critical OS findings) and a Debian 12 slim replacement (23
   high/critical OS findings). No finding was suppressed. The Dockerfile now uses an
-  immutable-digest distroless Debian 12 Python runtime, separates the dependency build stage, has no
-  runtime shell or package manager, and runs as UID/GID 65532. Python 3.11 was added to the full CI
-  test matrix because it is the container interpreter. The local ARM64 dependency build completed,
+  immutable-digest distroless Debian 12 Python runtime, separated the dependency build stage, had no
+  runtime shell or package manager, and ran as UID/GID 65532. Python 3.11 was added to the full CI
+  test matrix. The local ARM64 dependency build completed,
   but local Docker storage failed with filesystem I/O errors during final image commit. GitHub CI
   subsequently built the AMD64 image and passed its read-only, native-library, audit-chain and
   numeric non-root smoke checks. Its Trivy gate correctly rejected the image because the pinned
   distroless Debian runtime still contains release-blocking OS findings, including critical SQLite
   and zlib findings. No finding is suppressed and no passing final-image security claim is made.
-  A patched runtime and clean scan, or a formally approved evidence-backed disposition where legally
-  and clinically acceptable, is required before the `SOFTWARE` or `DEPLOYMENT` gate can be approved.
+  The current candidate replaces that runtime with an immutable Wolfi base, exact Python 3.12
+  package version, numeric non-root user, and no runtime package manager or shell. Its native ARM
+  image passed read-only/native-library/audit/CPU smoke checks and Trivy 0.70.0 reported zero
+  high/critical Wolfi or Python findings; the repository configuration/secret scan was also clean
+  and a valid container CycloneDX SBOM was generated. It has not yet produced a clean AMD64 CI
+  build/Trivy record, so the prior release failure remains open.
+  A clean scan and retained SBOM are required before the `SOFTWARE` or `DEPLOYMENT` gate can be approved.
 - `./setup.sh release-gate`: exits nonzero and lists all 13 pending gates, which is the correct current
   safety outcome.
 

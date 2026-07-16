@@ -1,0 +1,5 @@
+claim_id,proposed_claim,market,device_status_or_classification,evidence_required,current_evidence,decision,owner
+CLM-001,Research visualization of candidate nuclei in H&E image patches,all,non-clinical research labeling only,software verification and truthful limitations,repository tests and research snapshot,allowed for research only,regulatory-lead-unassigned
+CLM-002,Quantitative aid for nuclei instance segmentation reviewed by a pathologist,TBD,TBD by jurisdiction,analytical robustness external clinical validation human factors and authorization,none,blocked,regulatory-lead-unassigned
+CLM-003,Supports diagnosis grading prognosis or treatment decisions,TBD,TBD high clinical significance,regulator-agreed clinical utility evidence and full authorization,none,prohibited,regulatory-lead-unassigned
+CLM-004,Autonomous diagnosis or exclusion of malignancy,TBD,TBD highest concern,prospective clinical evidence and explicit authorization,none,prohibited,regulatory-lead-unassigned

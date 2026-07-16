@@ -1,0 +1,16 @@
+check_id,phase,requirement,predeclared_acceptance,evidence,executor,reviewer,result
+SQ-001,prerequisite,market and site authorization,authorization verified and in scope,TBD,operations-unassigned,regulatory-unassigned,not_run
+SQ-002,IQ,signed release image and model identity,signatures valid and hashes equal release record,TBD,operations-unassigned,quality-unassigned,not_run
+SQ-003,IQ,container least privilege and mounts,UID 65532 read-only root/app/model bounded tmp restricted durable audit no shell/package manager,TBD,operations-unassigned,security-unassigned,not_run
+SQ-004,IQ,controlled runtime configuration,release model audit token origins and limits match approved baseline without secret exposure,TBD,operations-unassigned,verification-unassigned,not_run
+SQ-005,IQ,TLS identity RBAC and network,TLS policy named MFA users least privilege site scope deny egress and approved ports pass,TBD,operations-unassigned,security-unassigned,not_run
+SQ-006,IQ,logging monitoring time and alerts,NTP and redacted logs active audit export and on-call test alert received,TBD,operations-unassigned,security-unassigned,not_run
+SQ-007,OQ,readiness and failure states,expected metadata when ready and 503 for each missing safeguard,TBD,verification-unassigned,quality-unassigned,not_run
+SQ-008,OQ,authentication and attribution,no unauthorized success and every authorized action has canonical actor/request/audit receipt,TBD,verification-unassigned,security-unassigned,not_run
+SQ-009,OQ,input and locked-setting controls,valid envelope succeeds and every negative/override case fails with expected status,TBD,verification-unassigned,clinical-safety-unassigned,not_run
+SQ-010,OQ,load and resource behavior,approved p95 error throughput memory CPU disk and recovery thresholds pass,TBD,verification-unassigned,operations-unassigned,not_run
+SQ-011,OQ,audit integrity and storage failures,no gaps tamper detected full/permission/export failures alert and analysis fails closed,TBD,verification-unassigned,quality-unassigned,not_run
+SQ-012,OQ,backup restore update and rollback,approved RTO/RPO exact compatible baseline audit continuity and signed rollback pass,TBD,operations-unassigned,quality-unassigned,not_run
+SQ-013,OQ,security verification,penetration host container SBOM egress and vulnerability evidence accepted with no unjustified critical/high,TBD,security-unassigned,quality-unassigned,not_run
+SQ-014,PQ,representative end-to-end workflow,all golden tolerances critical tasks downtime complaint and provenance criteria pass,TBD,site-users-unassigned,usability-unassigned,not_run
+SQ-015,release,training support and site acceptance,all roles competent deviations closed support staffed and required approvers sign,TBD,quality-unassigned,laboratory-director-unassigned,not_run

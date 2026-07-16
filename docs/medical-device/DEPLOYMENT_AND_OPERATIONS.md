@@ -11,8 +11,8 @@ internet or laboratory-client access to port 8000 is prohibited.
 The supplied hash-locked container is a CPU runtime. GPU acceleration requires a separately locked,
 scanned, performance-qualified, and clinically regression-tested image for the exact driver and
 accelerator stack; changing the PyTorch hardware build is a controlled release change.
-The supplied runtime is shell-less and package-manager-free, runs as numeric UID/GID 65532, and
-uses Python 3.11; site volume ownership and security policy must preserve that identity. Do not add
+The supplied runtime candidate is shell-less and package-manager-free, runs as numeric UID/GID
+65532, and uses Python 3.12; site volume ownership and security policy must preserve that identity. Do not add
 diagnostic tools to the production image—use an independently controlled debug image and incident
 procedure when investigation requires them.
 

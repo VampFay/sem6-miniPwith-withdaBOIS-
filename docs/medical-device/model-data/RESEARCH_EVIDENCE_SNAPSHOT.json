@@ -1,0 +1,124 @@
+{
+  "artifact_status": "research_only",
+  "clinical_evidence": {
+    "external_validation": "not_performed",
+    "held_out_test_fold": "not_performed",
+    "prospective_validation": "not_performed"
+  },
+  "dataset": {
+    "arrays": [
+      {
+        "dtype": "uint8",
+        "file": "images.npy",
+        "sha256": "07794ddb921f41388e3e21ac00e542c1a94a7bf6ea2b0fd2d3c19fb0587dd940",
+        "shape": [
+          7901,
+          256,
+          256,
+          3
+        ]
+      },
+      {
+        "dtype": "uint16",
+        "file": "instances.npy",
+        "sha256": "894b6b371168679c459160924697b2bc6d85220924714fea7aba8a899881054c",
+        "shape": [
+          7901,
+          256,
+          256
+        ]
+      },
+      {
+        "dtype": "uint8",
+        "file": "folds.npy",
+        "sha256": "460d970429f823129269f4b82e70feddcba9bd01abe87c9ad5fbea1d13d79881",
+        "shape": [
+          7901
+        ]
+      },
+      {
+        "dtype": "float16",
+        "file": "distances.npy",
+        "sha256": "8d644f502be285370a44c32db52616a6c70b7e92de62573654d5e7306962e9c9",
+        "shape": [
+          7901,
+          256,
+          256
+        ]
+      }
+    ],
+    "commercially_restricted": true,
+    "fold_counts": {
+      "1": 2656,
+      "2": 2523,
+      "3": 2722
+    },
+    "license": "CC BY-NC-SA 4.0",
+    "manifest_sha256": "dbca4c3fb948cd0b23edcef8d56bbf489ecdba212480ad5b82833689cd1ded9f",
+    "provenance_sha256": "3e41f43f6f327850f63c30b0d15842eeea24aa2eb2fcc8dd5ab61b8721c1ec4b",
+    "revision": "8bfedc274e5df3c5afcf258e4d05a968b197e88f",
+    "sample_count": 7901,
+    "source": "MedOtter/PanNuke"
+  },
+  "model": {
+    "artifact_type": "attn-dist-inference",
+    "checkpoint_epoch_zero_based": 42,
+    "configuration": {
+      "encoder": "efficientnet-b0",
+      "encoder_weights": "imagenet",
+      "model_name": "attn-dist",
+      "seed": 42,
+      "test_fold": 3,
+      "train_fold": 1,
+      "validation_fold": 2
+    },
+    "dataset": {
+      "manifest_sha256": "dbca4c3fb948cd0b23edcef8d56bbf489ecdba212480ad5b82833689cd1ded9f",
+      "test_fold": 3,
+      "train_fold": 1,
+      "validation_fold": 2
+    },
+    "format_version": 2,
+    "planned_epochs": 150,
+    "sha256": "5025fc9c58c5de13fb79686bd84df9ba8dff99c21af56587fe0ddf72bc733835",
+    "validation": {
+      "dice": 0.8221833194364385,
+      "iou": 0.7163205381186537,
+      "loss": 0.3809741468086273
+    }
+  },
+  "release_blockers": [
+    "The source dataset license restricts commercial use.",
+    "The recorded training run did not reach its configured epoch count.",
+    "No locked held-out test-fold evaluation is present.",
+    "No independent external multi-site validation is present.",
+    "No prospective workflow validation is present.",
+    "No clinical residual-risk acceptance is present."
+  ],
+  "release_disposition": "blocked",
+  "schema_version": 1,
+  "training_complete": false,
+  "training_metrics": {
+    "best_validation_dice": {
+      "epoch": 43,
+      "validation_dice": 0.8221833194364385,
+      "validation_iou": 0.7163205381186537,
+      "validation_loss": 0.3809741468086273
+    },
+    "best_validation_iou": {
+      "epoch": 43,
+      "validation_dice": 0.8221833194364385,
+      "validation_iou": 0.7163205381186537,
+      "validation_loss": 0.3809741468086273
+    },
+    "best_validation_loss": {
+      "epoch": 44,
+      "validation_dice": 0.8208554316293712,
+      "validation_iou": 0.7148803062585259,
+      "validation_loss": 0.3797579594899582
+    },
+    "epochs_recorded": 49,
+    "last_epoch": 49,
+    "sha256": "a5981178cf8472c909b0c6cf7790d9037b4ec5b87c53b112ebb9e3bcec091d61"
+  }
+}

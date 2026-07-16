@@ -215,6 +215,8 @@ check_project() {
   (cd "$ROOT" && "$PYTHON" -m mypy \
     --cache-dir="${ATTNDIST_MYPY_CACHE_DIR:-$ROOT/.mypy_cache}" \
     src train.py evaluate.py api.py scripts)
+  info "Validating controlled medical-device evidence"
+  (cd "$ROOT" && "$PYTHON" -m scripts.validate_medical_evidence)
   info "Running tests"
   (cd "$ROOT" && MPLBACKEND=Agg "$PYTHON" -m pytest -p no:cacheprovider -q)
   info "Type-checking web interface"

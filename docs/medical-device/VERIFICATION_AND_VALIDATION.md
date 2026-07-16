@@ -28,8 +28,8 @@ sequence gap, concurrent writer, unavailable mount, backup/restore, and external
 The frozen CI run shall additionally retain both CodeQL language analyses, Trivy image and
 configuration/secret scan logs, and the generated container CycloneDX artifact. Every alert requires
 documented triage; absence of a CI execution record is not equivalent to a passing scan.
-Container verification shall run the complete Python suite on both Python 3.11 (production runtime)
-and Python 3.12, build for the target architecture, verify the configured numeric non-root identity,
+Container verification shall run the complete Python suite on Python 3.11 and Python 3.12
+(production runtime), build for the target architecture, verify the configured numeric non-root identity,
 import the API plus native Torch/imaging stack under a read-only filesystem, append and verify an
 audit record on the qualified writable mount, and reject any release-blocking Trivy finding.
 

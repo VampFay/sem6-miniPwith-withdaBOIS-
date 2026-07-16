@@ -68,6 +68,7 @@ jobs:
       - run: bash -n setup.sh
       - run: uv run --no-sync ruff check src tests train.py evaluate.py api.py scripts
       - run: uv run --no-sync mypy src train.py evaluate.py api.py scripts
+      - run: uv run --no-sync python -m scripts.validate_medical_evidence
       - run: uv run --no-sync pytest --cov=src --cov=api --cov-report=term-missing --cov-fail-under=80
       - run: uv run --no-sync pip-audit --local
       - run: |
@@ -90,7 +91,7 @@ jobs:
             --read-only \
             --tmpfs /tmp:size=64m,uid=65532,gid=65532 \
             --tmpfs /audit:size=16m,uid=65532,gid=65532,mode=0700 \
-            --entrypoint /usr/bin/python3 attn-dist-net:ci -c \
+            --entrypoint /usr/bin/python3.12 attn-dist-net:ci -c \
             "import importlib.util, torch, api; \
             from pathlib import Path; \
             from src.provenance import AuditStore; \
@@ -102,9 +103,14 @@ jobs:
             assert not torch.cuda.is_available(); \
             assert importlib.util.find_spec('albumentations') is None; \
             assert importlib.util.find_spec('tensorboard') is None; \
+            assert not Path('/bin/sh').exists(); \
+            assert not Path('/bin/busybox').exists(); \
+            assert not Path('/sbin/apk').exists(); \
             assert api.live() == {'status': 'alive'}"
       - run: test "$(docker image inspect attn-dist-net:ci --format '{{.Config.User}}')" = "65532:65532"
       - name: Scan image for high and critical vulnerabilities
+        id: container_vulnerability_scan
+        continue-on-error: true
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: attn-dist-net:ci
@@ -114,6 +120,9 @@ jobs:
           vuln-type: os,library
           severity: CRITICAL,HIGH
       - name: Scan repository configuration and secrets
+        id: repository_security_scan
+        if: always()
+        continue-on-error: true
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
@@ -124,6 +133,7 @@ jobs:
           severity: CRITICAL,HIGH
           skip-setup-trivy: true
       - name: Generate container CycloneDX SBOM
+        if: always()
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: attn-dist-net:ci
@@ -131,11 +141,21 @@ jobs:
           output: container-sbom.cdx.json
           scanners: vuln
           skip-setup-trivy: true
-      - run: python -m json.tool container-sbom.cdx.json >/dev/null
+      - if: always()
+        run: python -m json.tool container-sbom.cdx.json >/dev/null
       - name: Retain container SBOM
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: container-sbom-${{ github.sha }}
           path: container-sbom.cdx.json
           if-no-files-found: error
           retention-days: 30
+      - name: Enforce container and repository security gates
+        if: always()
+        env:
+          CONTAINER_SCAN_OUTCOME: ${{ steps.container_vulnerability_scan.outcome }}
+          REPOSITORY_SCAN_OUTCOME: ${{ steps.repository_security_scan.outcome }}
+        run: |
+          test "$CONTAINER_SCAN_OUTCOME" = "success"
+          test "$REPOSITORY_SCAN_OUTCOME" = "success"

@@ -1,0 +1,5 @@
+record_id,asset,version_or_revision,intended_role,declared_license,commercial_use_status,privacy_ethics_status,legal_owner,evidence,status
+DLR-001,PanNuke via MedOtter/PanNuke,8bfedc274e5df3c5afcf258e4d05a968b197e88f,research development and validation,CC BY-NC-SA 4.0,blocked - noncommercial,public research dataset provenance only,legal-owner-unassigned,data/pannuke/provenance.json,blocked
+DLR-002,PanNuke-derived checkpoint,5025fc9c58c5de13fb79686bd84df9ba8dff99c21af56587fe0ddf72bc733835,research inference,derivative status requires counsel,blocked,not clinical evidence,legal-owner-unassigned,docs/medical-device/model-data/RESEARCH_EVIDENCE_SNAPSHOT.json,blocked
+DLR-003,Commercial development dataset,TBD,training and tuning,TBD,pending,pending ethics and privacy review,legal-owner-unassigned,TBD,not_acquired
+DLR-004,Independent external dataset,TBD,locked external validation,TBD,pending,pending ethics and privacy review,legal-owner-unassigned,TBD,not_acquired
