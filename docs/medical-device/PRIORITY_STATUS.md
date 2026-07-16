@@ -13,13 +13,18 @@ CI now retains downstream security evidence even if one gate fails and enforces 
 The native ARM image built successfully; read-only/native-library/audit/CPU smoke tests passed; the
 runtime contains no `/bin/sh`, BusyBox executable or `apk`; Trivy 0.70.0 reported zero high/critical
 Wolfi or Python findings; the repository misconfiguration/secret gate reported zero findings; and a
-validated container CycloneDX SBOM was generated.
+validated container CycloneDX SBOM was generated. The same controls then passed on a clean, native
+AMD64 GitHub runner for commit `bd69363b10373d6d1a627e4cc3a6c0bc386e2498` in quality run
+[`29517452489`](https://github.com/VampFay/sem6-miniPwith-withdaBOIS-/actions/runs/29517452489),
+including the high/critical image gate, configuration/secret scan, no-shell/no-package-manager smoke
+test, numeric non-root-user check and retained CycloneDX SBOM. This resolves the identified
+Debian/Distroless container-vulnerability finding for the repository-controlled candidate at the
+time of that scan; no vulnerability was suppressed.
 
-Open: the candidate must reproduce those results for AMD64 on a clean GitHub runner; the user's
-local `DOCKER_DEFAULT_PLATFORM=linux/amd64` requires emulation and caused an esbuild Go-runtime
-failure, while explicit native ARM succeeded. The prior Debian/Distroless finding is not closed for
-release evidence until clean target-architecture CI exists. Independent penetration, DAST, fuzz and
-infrastructure scans remain release requirements.
+Open for medical release: independently repeat the scan against the frozen, signed production image
+and deployment infrastructure, review the retained SBOM, and complete penetration, DAST and fuzz
+testing. A clean point-in-time scan is not a perpetual assurance claim; recurring monitoring and
+documented vulnerability disposition remain mandatory.
 
 ## Priority 2 — Model and data evidence
 

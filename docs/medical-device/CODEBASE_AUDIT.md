@@ -115,9 +115,15 @@ repository work alone.
   package version, numeric non-root user, and no runtime package manager or shell. Its native ARM
   image passed read-only/native-library/audit/CPU smoke checks and Trivy 0.70.0 reported zero
   high/critical Wolfi or Python findings; the repository configuration/secret scan was also clean
-  and a valid container CycloneDX SBOM was generated. It has not yet produced a clean AMD64 CI
-  build/Trivy record, so the prior release failure remains open.
-  A clean scan and retained SBOM are required before the `SOFTWARE` or `DEPLOYMENT` gate can be approved.
+  and a valid container CycloneDX SBOM was generated. Clean native AMD64 GitHub quality run
+  [`29517452489`](https://github.com/VampFay/sem6-miniPwith-withdaBOIS-/actions/runs/29517452489)
+  reproduced the build and smoke checks, passed the high/critical image gate and repository
+  configuration/secret scan, and retained the container SBOM for commit
+  `bd69363b10373d6d1a627e4cc3a6c0bc386e2498`. The identified base-image finding is therefore closed
+  for this repository-controlled candidate at that point in time, without suppressions. Independent
+  frozen-release scan review, signed-image provenance, penetration/DAST/fuzz testing, infrastructure
+  scanning and recurring vulnerability disposition are still required before the `SOFTWARE` or
+  `DEPLOYMENT` gate can be approved.
 - `./setup.sh release-gate`: exits nonzero and lists all 13 pending gates, which is the correct current
   safety outcome.
 
