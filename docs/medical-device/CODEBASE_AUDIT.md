@@ -25,7 +25,7 @@ certificate. Ratings use 10 as “credible release evidence exists for the state
 | Audit/provenance | 8/10 | Input/model hashes, release/settings/device provenance and durable sequenced/hash-chained records with process locking, persisted-head truncation detection, and readiness checks. | Qualified durable/WORM retention, backup/restore, external head anchoring, multi-system reconciliation and audit review SOP. |
 | Output semantics and reports | 8/10 | “Foreground score” and “TTA disagreement” replace diagnostic probability/uncertainty claims; no-TTA omits disagreement; reports carry provenance and disclaimers. | Summative comprehension/usability validation and regulator-approved labeling. |
 | Architecture/maintainability | 8/10 | Analysis orchestration, postprocessing, validation, runtime and provenance have focused modules; API is a boundary layer; no generated dead-code paths were added. | Independent design review, long-term ownership and controlled anomaly/change process. |
-| Automated verification | 7/10 | 102 tests pass; Ruff, mypy, shell, medical-evidence validation, TypeScript and production build pass; aggregate coverage is 83.79% against an enforced 80% gate. Tiled inference is 94% covered with border/seam invariants. | Independent property/fuzz/end-to-end/soak/fault-injection evidence; training orchestration remains below desired safety-critical depth. |
+| Automated verification | 7/10 | 108 tests pass; Ruff, mypy, shell, medical-evidence validation, TypeScript and production build pass; aggregate coverage is 83.86% against an enforced 80% gate. Tiled inference is 94% covered with border/seam invariants. | Independent property/fuzz/end-to-end/soak/fault-injection evidence; training orchestration remains below desired safety-critical depth. |
 | Dependency/supply chain | 8/10 | Hash-locked runtime, CPU-only Linux Torch source, immutable CI/base-image/scanner pins, non-root image, Python SBOM/hash receipt, and configured CodeQL plus Trivy image/configuration/secret gates with retained container CycloneDX; Python/npm audits report zero known vulnerabilities at audit time. | Execute and independently review frozen-commit SAST/container evidence; SBOM signing, license scan, supplier qualification, recurring monitoring and vulnerability disposition. |
 | Deployment/operations | 5/10 | Reproducible CPU image, health/readiness split, load harness, locked settings and documented gateway/read-only topology. | Production infrastructure, GPU image if used, IQ/OQ/PQ, capacity/soak, monitoring, backup/rollback and disaster exercises per site. |
 | Clinical evidence | 1/10 | A study framework exists; no repository evidence establishes clinical performance or utility. | Independent multi-site retrospective and prospective studies under approved protocols, plus reader/utility study if claimed. |
@@ -89,10 +89,10 @@ repository work alone.
 
 ## Verification evidence from this audit
 
-- Repository verification components: 102 tests pass; Ruff, mypy over 37 source files, shell and
+- Repository verification components: 108 tests pass; Ruff, mypy over 37 source files, shell and
   medical-evidence validation, TypeScript
   typecheck and the production UI build pass.
-- Coverage: 83.79% against an enforced 80% aggregate CI threshold; tiled inference is 94%, audit
+- Coverage: 83.86% against an enforced 80% aggregate CI threshold; tiled inference is 94%, audit
   provenance 93%, request limiting 94%, runtime configuration 97%, and image validation 92%.
 - Python dependency audit: no known vulnerabilities found; the local project itself is not a PyPI
   package and is reviewed as source.

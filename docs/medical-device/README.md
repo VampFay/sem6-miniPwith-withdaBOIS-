@@ -18,6 +18,8 @@ regulatory gates without the designated qualified reviewers.
 - [PRIORITY_STATUS.md](PRIORITY_STATUS.md): exact implemented-versus-open status for container,
   evidence, QMS, regulatory, privacy/security, human factors, sites and postmarket work.
 - [DOCUMENT_INDEX.csv](DOCUMENT_INDEX.csv): controlled document inventory; validated in CI.
+- [EXECUTION_WORKSTREAMS.json](EXECUTION_WORKSTREAMS.json): machine-validated dependencies, owners,
+  execution plans, record templates, and exit criteria for the ten deployment workstreams.
 - [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md): ordered deployment-readiness program with
   owners, dependencies, deliverables, acceptance evidence, and stop/go gates.
 - [CODEBASE_AUDIT.md](CODEBASE_AUDIT.md): severity-ranked engineering audit, implemented
@@ -50,6 +52,25 @@ regulatory gates without the designated qualified reviewers.
 - [site/SITE_QUALIFICATION.md](site/SITE_QUALIFICATION.md): per-site IQ/OQ/PQ, recovery and acceptance.
 - [postmarket/POSTMARKET_OPERATIONS.md](postmarket/POSTMARKET_OPERATIONS.md): surveillance, signal,
   complaint, vigilance, drift and field-action system.
+- [governance/GOVERNANCE_AND_PRODUCT_DEFINITION.md](governance/GOVERNANCE_AND_PRODUCT_DEFINITION.md):
+  legal-manufacturer, accountability, intended-use and claim-lock execution.
+- [model-data/MODEL_DEVELOPMENT_EXECUTION.md](model-data/MODEL_DEVELOPMENT_EXECUTION.md): licensed
+  data intake, reproducible candidate freeze and clinical-study execution records.
+- [qms/QMS_ACTIVATION.md](qms/QMS_ACTIVATION.md): conversion of drafts into an effective, audited QMS.
+- [verification/RISK_AND_VERIFICATION_EXECUTION.md](verification/RISK_AND_VERIFICATION_EXECUTION.md):
+  independent baseline, test, anomaly and residual-risk execution.
+- [privacy-security/SECURITY_PRIVACY_QUALIFICATION.md](privacy-security/SECURITY_PRIVACY_QUALIFICATION.md):
+  frozen-topology privacy, security, penetration and operational-exercise qualification.
+- [regulatory/REGULATORY_SUBMISSION_EXECUTION.md](regulatory/REGULATORY_SUBMISSION_EXECUTION.md):
+  classification, submission, deficiency and authorization control.
+- [human-factors/USABILITY_EXECUTION.md](human-factors/USABILITY_EXECUTION.md): representative-user,
+  summative, labeling, training and competency execution.
+- [site/SITE_GO_LIVE_EXECUTION.md](site/SITE_GO_LIVE_EXECUTION.md): site dossier, IQ/OQ/PQ and signed
+  go-live handoff.
+- [postmarket/POSTMARKET_EXECUTION.md](postmarket/POSTMARKET_EXECUTION.md): staffed intake, vigilance,
+  CAPA, field action, installed-base and simulation activation.
+- [operations/PROFESSIONAL_USE_RUNBOOK.md](operations/PROFESSIONAL_USE_RUNBOOK.md): start-of-day,
+  per-case, exception, downtime, stop-use, handover and end-of-day professional workflow.
 
 ## Required accountable roles
 

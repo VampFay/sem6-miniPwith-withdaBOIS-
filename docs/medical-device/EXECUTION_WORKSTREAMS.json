@@ -1,0 +1,180 @@
+{
+  "schema_version": 1,
+  "product": "Attn-Dist-Net",
+  "authorized_use": "research_only",
+  "workstreams": [
+    {
+      "id": "WS-01",
+      "title": "Legal manufacturer, governance, and intended-use lock",
+      "status": "execution_pending",
+      "owner": "executive-sponsor-unassigned",
+      "approver": "legal-manufacturer-unassigned",
+      "execution_plan": "docs/medical-device/governance/GOVERNANCE_AND_PRODUCT_DEFINITION.md",
+      "record_templates": ["docs/medical-device/governance/DECISION_REGISTER.csv"],
+      "completed_evidence": [],
+      "approved_at": null,
+      "dependencies": [],
+      "exit_criteria": [
+        "legal manufacturer and accountable roles are appointed",
+        "one initial market and evidence-backed intended use are approved",
+        "claims and operating envelope are frozen under change control"
+      ]
+    },
+    {
+      "id": "WS-02",
+      "title": "Model, data, license, and clinical-evidence execution",
+      "status": "execution_pending",
+      "owner": "model-and-clinical-leads-unassigned",
+      "approver": "clinical-safety-and-legal-unassigned",
+      "execution_plan": "docs/medical-device/model-data/MODEL_DEVELOPMENT_EXECUTION.md",
+      "record_templates": [
+        "docs/medical-device/model-data/DATASET_INTAKE_REGISTER.csv",
+        "docs/medical-device/model-data/CLINICAL_STUDY_REGISTER.csv"
+      ],
+      "completed_evidence": [],
+      "approved_at": null,
+      "dependencies": ["WS-01"],
+      "exit_criteria": [
+        "commercially permitted representative data are accepted",
+        "a reproducible model candidate is frozen",
+        "preregistered internal, external, and prospective evidence meets approved criteria"
+      ]
+    },
+    {
+      "id": "WS-03",
+      "title": "Operational quality management system",
+      "status": "execution_pending",
+      "owner": "quality-manager-unassigned",
+      "approver": "legal-manufacturer-unassigned",
+      "execution_plan": "docs/medical-device/qms/QMS_ACTIVATION.md",
+      "record_templates": ["docs/medical-device/qms/QMS_RECORD_REGISTER.csv"],
+      "completed_evidence": [],
+      "approved_at": null,
+      "dependencies": ["WS-01"],
+      "exit_criteria": [
+        "controlled procedures are approved and effective",
+        "personnel and suppliers are qualified",
+        "internal audit and management review demonstrate an effective QMS"
+      ]
+    },
+    {
+      "id": "WS-04",
+      "title": "Risk management and independent software verification",
+      "status": "execution_pending",
+      "owner": "verification-lead-unassigned",
+      "approver": "clinical-safety-and-quality-unassigned",
+      "execution_plan": "docs/medical-device/verification/RISK_AND_VERIFICATION_EXECUTION.md",
+      "record_templates": ["docs/medical-device/verification/ANOMALY_REGISTER.csv"],
+      "completed_evidence": [],
+      "approved_at": null,
+      "dependencies": ["WS-01", "WS-02", "WS-03"],
+      "exit_criteria": [
+        "requirements, risks, controls, and tests are completely traced",
+        "independent verification passes on the frozen release",
+        "anomalies and residual risks receive qualified approval"
+      ]
+    },
+    {
+      "id": "WS-05",
+      "title": "Cybersecurity and privacy qualification",
+      "status": "execution_pending",
+      "owner": "security-and-privacy-leads-unassigned",
+      "approver": "quality-and-legal-manufacturer-unassigned",
+      "execution_plan": "docs/medical-device/privacy-security/SECURITY_PRIVACY_QUALIFICATION.md",
+      "record_templates": ["docs/medical-device/privacy-security/SECURITY_PRIVACY_EVIDENCE_REGISTER.csv"],
+      "completed_evidence": [],
+      "approved_at": null,
+      "dependencies": ["WS-01", "WS-03"],
+      "exit_criteria": [
+        "production data flows, contracts, access, retention, and DPIA are approved",
+        "independent security testing has no unjustified critical or high finding",
+        "incident, restore, patch, and disclosure operations are exercised"
+      ]
+    },
+    {
+      "id": "WS-06",
+      "title": "Regulatory classification, submission, and authorization",
+      "status": "execution_pending",
+      "owner": "regulatory-lead-unassigned",
+      "approver": "legal-manufacturer-unassigned",
+      "execution_plan": "docs/medical-device/regulatory/REGULATORY_SUBMISSION_EXECUTION.md",
+      "record_templates": ["docs/medical-device/regulatory/MARKET_AUTHORIZATION_REGISTER.csv"],
+      "completed_evidence": [],
+      "approved_at": null,
+      "dependencies": ["WS-01", "WS-02", "WS-03", "WS-04", "WS-05"],
+      "exit_criteria": [
+        "classification and pathway are documented for each launch market",
+        "submission deficiencies are closed",
+        "authorization, registration, and approved labeling are effective"
+      ]
+    },
+    {
+      "id": "WS-07",
+      "title": "Human factors, labeling, training, and competency",
+      "status": "execution_pending",
+      "owner": "usability-lead-unassigned",
+      "approver": "clinical-and-regulatory-unassigned",
+      "execution_plan": "docs/medical-device/human-factors/USABILITY_EXECUTION.md",
+      "record_templates": ["docs/medical-device/human-factors/USER_COMPETENCY_REGISTER.csv"],
+      "completed_evidence": [],
+      "approved_at": null,
+      "dependencies": ["WS-01", "WS-02", "WS-04"],
+      "exit_criteria": [
+        "formative findings are closed",
+        "summative validation has no unexplained critical use error",
+        "approved labeling and competent-user records exist"
+      ]
+    },
+    {
+      "id": "WS-08",
+      "title": "Site installation, operational, and performance qualification",
+      "status": "execution_pending",
+      "owner": "operations-owner-unassigned",
+      "approver": "site-quality-and-laboratory-director-unassigned",
+      "execution_plan": "docs/medical-device/site/SITE_GO_LIVE_EXECUTION.md",
+      "record_templates": ["docs/medical-device/site/SITE_EXECUTION_REGISTER.csv"],
+      "completed_evidence": [],
+      "approved_at": null,
+      "dependencies": ["WS-04", "WS-05", "WS-06", "WS-07"],
+      "exit_criteria": [
+        "site-specific IQ, OQ, and PQ pass with deviations closed",
+        "restore, rollback, load, downtime, and security tests pass",
+        "manufacturer and site acceptance are signed"
+      ]
+    },
+    {
+      "id": "WS-09",
+      "title": "Postmarket surveillance and response operations",
+      "status": "execution_pending",
+      "owner": "quality-manager-unassigned",
+      "approver": "clinical-safety-and-regulatory-unassigned",
+      "execution_plan": "docs/medical-device/postmarket/POSTMARKET_EXECUTION.md",
+      "record_templates": ["docs/medical-device/postmarket/POSTMARKET_EVENT_REGISTER.csv"],
+      "completed_evidence": [],
+      "approved_at": null,
+      "dependencies": ["WS-01", "WS-03", "WS-05", "WS-06"],
+      "exit_criteria": [
+        "staffed intake, reporting, CAPA, field-action, and cybersecurity routes exist",
+        "release baseline, telemetry, thresholds, and installed-base inventory are approved",
+        "incident and recall simulations pass"
+      ]
+    },
+    {
+      "id": "WS-10",
+      "title": "Daily professional use and clinical operations",
+      "status": "execution_pending",
+      "owner": "laboratory-operations-owner-unassigned",
+      "approver": "laboratory-director-unassigned",
+      "execution_plan": "docs/medical-device/operations/PROFESSIONAL_USE_RUNBOOK.md",
+      "record_templates": ["docs/medical-device/operations/DAILY_SAFETY_CHECKLIST.csv"],
+      "completed_evidence": [],
+      "approved_at": null,
+      "dependencies": ["WS-06", "WS-07", "WS-08", "WS-09"],
+      "exit_criteria": [
+        "only trained named users can access the approved site release",
+        "start-of-day, per-case, exception, downtime, and end-of-day controls are effective",
+        "laboratory leadership accepts the workflow and escalation paths"
+      ]
+    }
+  ]
+}

@@ -1,8 +1,22 @@
 # Medical Deployment Priority Status
 
-**Status date:** 2026-07-16. **Overall disposition:** release blocked; research use only. “Implemented”
+**Status date:** 2026-07-17. **Overall disposition:** release blocked; research use only. “Implemented”
 below means repository-controlled engineering or a draft protocol exists. It never means a study,
 QMS approval, site qualification or regulatory authorization occurred.
+
+## Ten-workstream execution layer
+
+Implemented in the repository: `EXECUTION_WORKSTREAMS.json` now controls all ten workstreams from
+legal-manufacturer/intended-use governance through daily professional use. Each workstream has an
+execution plan, objective-record template, dependency graph and explicit exit criteria. CI rejects
+missing workstreams/templates, invalid schemas, dependency cycles, false clinical authorization,
+false readiness with unassigned accountability, and removal or downgrading of a critical daily-use
+control. The controlled document index now covers 58 artifacts.
+
+Open/blocking: all ten workstreams remain `execution_pending`; their owners and approvers are still
+unassigned. The execution plans and blank record systems must be instantiated by the accountable
+organizations with genuine signed evidence. They do not approve themselves and do not change the
+research-only authorization boundary.
 
 ## Priority 0 — Container vulnerabilities
 

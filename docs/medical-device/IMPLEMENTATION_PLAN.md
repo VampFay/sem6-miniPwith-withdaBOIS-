@@ -13,6 +13,13 @@ The accountable legal manufacturer must replace every `*-unassigned` owner in
 `RELEASE_READINESS.json`. Gate status may be changed only by the named human approver after every
 listed evidence artifact exists and has passed independent review.
 
+The operational view of this program is the machine-validated
+[`EXECUTION_WORKSTREAMS.json`](EXECUTION_WORKSTREAMS.json). It consolidates the phases below into ten
+dependency-controlled execution workstreams, links each plan and record template, and cannot be
+marked ready without assigned accountability, dated approval, non-template completed evidence and
+ready dependencies. Its `authorized_use` remains `research_only` until every workstream and release
+gate is independently approved.
+
 ## Program sequence
 
 ### Phase 0 — Governance and stop-use control
