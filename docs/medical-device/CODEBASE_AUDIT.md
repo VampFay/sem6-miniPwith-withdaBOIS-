@@ -25,9 +25,9 @@ certificate. Ratings use 10 as “credible release evidence exists for the state
 | Audit/provenance | 8/10 | Input/model hashes, release/settings/device provenance and durable sequenced/hash-chained records with process locking, persisted-head truncation detection, and readiness checks. | Qualified durable/WORM retention, backup/restore, external head anchoring, multi-system reconciliation and audit review SOP. |
 | Output semantics and reports | 8/10 | “Foreground score” and “TTA disagreement” replace diagnostic probability/uncertainty claims; no-TTA omits disagreement; reports carry provenance and disclaimers. | Summative comprehension/usability validation and regulator-approved labeling. |
 | Architecture/maintainability | 8/10 | Analysis orchestration, postprocessing, validation, runtime and provenance have focused modules; API is a boundary layer; no generated dead-code paths were added. | Independent design review, long-term ownership and controlled anomaly/change process. |
-| Automated verification | 7/10 | 108 tests pass; Ruff, mypy, shell, medical-evidence validation, TypeScript and production build pass; aggregate coverage is 83.86% against an enforced 80% gate. Tiled inference is 94% covered with border/seam invariants. | Independent property/fuzz/end-to-end/soak/fault-injection evidence; training orchestration remains below desired safety-critical depth. |
+| Automated verification | 8/10 | 129 tests pass; Ruff, mypy, shell, medical-evidence validation, TypeScript and production build pass; aggregate coverage is 86.51% against an enforced 80% gate. Clinical aggregation is 96%, repeatability and uncertainty analysis 92%, metrics 98%, and tiled inference 94% covered. | Independent property/fuzz/end-to-end/soak/fault-injection evidence; training orchestration remains below desired safety-critical depth. |
 | Dependency/supply chain | 8/10 | Hash-locked runtime, CPU-only Linux Torch source, immutable CI/base-image/scanner pins, non-root image, Python SBOM/hash receipt, and configured CodeQL plus Trivy image/configuration/secret gates with retained container CycloneDX; Python/npm audits report zero known vulnerabilities at audit time. | Execute and independently review frozen-commit SAST/container evidence; SBOM signing, license scan, supplier qualification, recurring monitoring and vulnerability disposition. |
-| Deployment/operations | 5/10 | Reproducible CPU image, health/readiness split, load harness, locked settings and documented gateway/read-only topology. | Production infrastructure, GPU image if used, IQ/OQ/PQ, capacity/soak, monitoring, backup/rollback and disaster exercises per site. |
+| Deployment/operations | 5/10 | Reproducible CPU image, health/readiness split, load harness, frozen-topology manifest and hash-bound direct inference benchmark with tail latency/resource/determinism evidence. | Production infrastructure, GPU image if used, executed CPU/GPU benchmarks, IQ/OQ/PQ, capacity/soak, monitoring, backup/rollback and disaster exercises per site. |
 | Clinical evidence | 1/10 | A study framework exists; no repository evidence establishes clinical performance or utility. | Independent multi-site retrospective and prospective studies under approved protocols, plus reader/utility study if claimed. |
 | Usability/human factors | 1/10 | Safer terminology and workflow constraints are implemented; no representative-user validation exists. | Formative and summative studies with oncologists/pathologists/laboratory staff. |
 | QMS/regulatory/privacy/postmarket | 2/10 | Controlled draft manuals, procedures, protocols, registers, a document index and fail-closed evidence checks exist; accountable owners, operating records, approvals and authorizations do not. | Operational QMS, market strategy/authorization, privacy agreements/DPIA, labeling, complaints/vigilance/CAPA readiness. |
@@ -67,6 +67,12 @@ repository work alone.
     tensor/primitives schema (format version 3); legacy unrestricted-pickle resume artifacts fail
     closed. Checkpoint writes use atomic file and directory synchronization. Inference remains on its
     distinct version-2 weights-only schema.
+12. **Patch-level clinical pseudoreplication.** Formal evaluation now preserves site/patient/slide
+    hierarchy, resamples patients within sites, records raw object sufficient statistics and reports
+    failure/subgroup denominators. The legacy patch bootstrap is explicitly research-only.
+13. **Uncontrolled evidence promotion.** Draft study rows, blank model/topology templates and
+    unexecuted protocols cannot satisfy the clinical release gate. Completed studies require frozen
+    hashes, reports, results, accountable approvals and a completed model card.
 
 ## Residual high-risk work
 
@@ -89,10 +95,10 @@ repository work alone.
 
 ## Verification evidence from this audit
 
-- Repository verification components: 108 tests pass; Ruff, mypy over 37 source files, shell and
+- Repository verification components: 129 tests pass; Ruff, mypy over 44 source files, shell and
   medical-evidence validation, TypeScript
   typecheck and the production UI build pass.
-- Coverage: 83.86% against an enforced 80% aggregate CI threshold; tiled inference is 94%, audit
+- Coverage: 86.51% against an enforced 80% aggregate CI threshold; tiled inference is 94%, audit
   provenance 93%, request limiting 94%, runtime configuration 97%, and image validation 92%.
 - Python dependency audit: no known vulnerabilities found; the local project itself is not a PyPI
   package and is reviewed as source.

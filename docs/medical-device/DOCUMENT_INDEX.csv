@@ -32,6 +32,7 @@ MD-MDE-FRM-004,Frozen model card template,docs/medical-device/model-data/FROZEN_
 MD-MDE-FRM-005,Clinical evaluation manifest template,docs/medical-device/model-data/EVALUATION_MANIFEST.template.csv,0.1,template,clinical-validation-lead-unassigned,statistics-unassigned,
 MD-MDE-FRM-006,Uncertainty calibration input template,docs/medical-device/model-data/UNCERTAINTY_CALIBRATION.template.csv,0.1,template,model-verification-unassigned,statistics-unassigned,
 MD-MDE-FRM-007,Uncertainty held-out evaluation input template,docs/medical-device/model-data/UNCERTAINTY_EVALUATION.template.csv,0.1,template,model-verification-unassigned,clinical-safety-and-statistics-unassigned,
+MD-MDE-FRM-008,Repeatability and reproducibility input template,docs/medical-device/model-data/REPEATABILITY_INPUT.template.csv,0.1,template,model-verification-unassigned,statistics-and-quality-unassigned,
 MD-SQ-FRM-002,Frozen deployment topology manifest,docs/medical-device/site/TOPOLOGY_MANIFEST.template.json,1,template,operations-owner-unassigned,site-quality-unassigned,
 MD-QM-001,Quality manual,docs/medical-device/qms/QUALITY_MANUAL.md,0.1,draft,quality-manager-unassigned,legal-manufacturer-unassigned,
 MD-SOP-001,Document record and training control,docs/medical-device/qms/SOP_DOCUMENT_AND_RECORD_CONTROL.md,0.1,draft,quality-manager-unassigned,legal-manufacturer-unassigned,

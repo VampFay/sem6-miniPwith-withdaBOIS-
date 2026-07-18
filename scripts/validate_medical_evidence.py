@@ -30,6 +30,24 @@ REQUIRED_GATES = {
 }
 REQUIRED_WORKSTREAMS = {f"WS-{number:02d}" for number in range(1, 11)}
 ALLOWED_WORKSTREAM_STATUSES = {"execution_pending", "in_progress", "ready", "blocked"}
+REQUIRED_VALIDATION_STUDIES = {
+    "PV-INT-001",
+    "PV-RR-001",
+    "PV-EXT-001",
+    "PV-PRO-001",
+    "PV-RDR-001",
+    "PV-TOP-001",
+}
+ALLOWED_STUDY_STATUSES = {
+    "protocol_draft",
+    "approved_not_started",
+    "in_progress",
+    "database_locked",
+    "reported",
+    "closed",
+    "not_required_approved",
+    "blocked",
+}
 RECORD_SCHEMAS = {
     "docs/medical-device/governance/DECISION_REGISTER.csv": {
         "decision_id",
@@ -143,6 +161,57 @@ REQUIRED_DAILY_CONTROLS = {
     *(f"DAY-{number:03d}" for number in range(1, 9)),
     *(f"CASE-{number:03d}" for number in range(1, 7)),
 }
+VALIDATION_TEMPLATE_SCHEMAS = {
+    "docs/medical-device/model-data/EVALUATION_MANIFEST.template.csv": {
+        "site_id",
+        "patient_id",
+        "specimen_id",
+        "slide_id",
+        "scan_id",
+        "region_id",
+        "result_status",
+        "truth_path",
+        "prediction_path",
+        "failure_reason",
+    },
+    "docs/medical-device/model-data/UNCERTAINTY_CALIBRATION.template.csv": {
+        "site_id",
+        "patient_id",
+        "confidence",
+        "correct",
+    },
+    "docs/medical-device/model-data/UNCERTAINTY_EVALUATION.template.csv": {
+        "site_id",
+        "patient_id",
+        "confidence",
+        "correct",
+        "severe_failure",
+    },
+    "docs/medical-device/model-data/REPEATABILITY_INPUT.template.csv": {
+        "site_id",
+        "patient_id",
+        "slide_id",
+        "item_id",
+        "condition_id",
+        "replicate_id",
+        "predicted_count",
+        "output_sha256",
+        "aji_plus",
+        "pq",
+    },
+    "docs/medical-device/model-data/SUBGROUP_AND_FAILURE_TAXONOMY.csv": {
+        "taxonomy_id",
+        "kind",
+        "name",
+        "status",
+        "locked_definition",
+        "required_metadata",
+        "primary_failure_measures",
+        "clinical_disposition",
+        "owner",
+        "approver",
+    },
+}
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -247,6 +316,192 @@ def validate_model_evidence(snapshot_path: Path) -> None:
         raise MedicalEvidenceError("Commercially restricted data must block release.")
     if snapshot.get("artifact_status") == "research_only" and not snapshot.get("release_blockers"):
         raise MedicalEvidenceError("Research-only evidence must state its release blockers.")
+
+
+def _is_sha256(value: str) -> bool:
+    normalized = value.strip().lower()
+    return len(normalized) == 64 and all(
+        character in "0123456789abcdef" for character in normalized
+    )
+
+
+def validate_model_validation_controls(root: Path) -> int:
+    for relative, required_fields in VALIDATION_TEMPLATE_SCHEMAS.items():
+        path = _inside_file(root, relative)
+        with path.open(newline="", encoding="utf-8") as stream:
+            reader = csv.reader(stream)
+            try:
+                fields = {field.strip() for field in next(reader)}
+            except StopIteration as error:
+                raise MedicalEvidenceError(f"Validation template is empty: {relative}") from error
+        missing = required_fields - fields
+        if missing:
+            raise MedicalEvidenceError(
+                f"Validation template {relative} is missing fields: {sorted(missing)}"
+            )
+
+    frozen_template = _load_json(
+        _inside_file(
+            root, "docs/medical-device/model-data/FROZEN_MODEL_CARD.template.json"
+        )
+    )
+    if (
+        frozen_template.get("schema_version") != 1
+        or frozen_template.get("status") != "template_not_frozen"
+        or frozen_template.get("candidate_id") is not None
+    ):
+        raise MedicalEvidenceError(
+            "Frozen-model template could be mistaken for a frozen candidate."
+        )
+    topology_template = _load_json(
+        _inside_file(root, "docs/medical-device/site/TOPOLOGY_MANIFEST.template.json")
+    )
+    if (
+        topology_template.get("schema_version") != 1
+        or topology_template.get("status") != "template_not_frozen"
+        or topology_template.get("topology_id") is not None
+    ):
+        raise MedicalEvidenceError("Topology template could be mistaken for a frozen topology.")
+
+    register = _inside_file(
+        root, "docs/medical-device/model-data/CLINICAL_STUDY_REGISTER.csv"
+    )
+    with register.open(newline="", encoding="utf-8") as stream:
+        rows = list(csv.DictReader(stream))
+    required_study_fields = {
+        "study_id",
+        "status",
+        "candidate_model_sha256",
+        "dataset_manifest_sha256",
+        "first_subject_or_analysis_date",
+        "database_lock_date",
+        "report_id",
+        "result",
+        "clinical_statistical_approvers",
+        "approval_date",
+    }
+    if not rows or required_study_fields - set(rows[0]):
+        raise MedicalEvidenceError(
+            "Clinical validation study register is empty or has an invalid schema."
+        )
+    identifiers = [row["study_id"].strip() for row in rows]
+    if set(identifiers) != REQUIRED_VALIDATION_STUDIES or len(identifiers) != len(set(identifiers)):
+        raise MedicalEvidenceError(
+            f"Clinical validation study set differs from the controlled set: {sorted(identifiers)}"
+        )
+    for row in rows:
+        identifier = row["study_id"].strip()
+        status = row["status"].strip()
+        if status not in ALLOWED_STUDY_STATUSES:
+            raise MedicalEvidenceError(
+                f"Clinical study {identifier} has invalid status {status!r}."
+            )
+        if status == "protocol_draft" and (
+            row["result"].strip() != "not_executed"
+            or row["first_subject_or_analysis_date"].strip()
+            or row["database_lock_date"].strip()
+            or row["report_id"].strip()
+            or row["approval_date"].strip()
+        ):
+            raise MedicalEvidenceError(
+                f"Draft clinical study {identifier} contains execution or approval claims."
+            )
+        if status in {"reported", "closed"}:
+            if not _is_sha256(row["candidate_model_sha256"]) or not _is_sha256(
+                row["dataset_manifest_sha256"]
+            ):
+                raise MedicalEvidenceError(
+                    f"Reported clinical study {identifier} lacks candidate/dataset hashes."
+                )
+            if (
+                not row["report_id"].strip()
+                or row["result"].strip() in {"", "not_executed"}
+                or not row["first_subject_or_analysis_date"].strip()
+                or not row["database_lock_date"].strip()
+                or "unassigned" in row["clinical_statistical_approvers"].lower()
+            ):
+                raise MedicalEvidenceError(
+                    f"Reported clinical study {identifier} lacks dates, report, "
+                    "result, or approvers."
+                )
+        if status == "closed" and not row["approval_date"].strip():
+            raise MedicalEvidenceError(
+                f"Closed clinical study {identifier} has no approval date."
+            )
+        if status == "not_required_approved" and (
+            identifier != "PV-RDR-001"
+            or not row["result"].strip()
+            or row["result"].strip() == "not_executed"
+            or "unassigned" in row["clinical_statistical_approvers"].lower()
+            or not row["approval_date"].strip()
+        ):
+            raise MedicalEvidenceError(
+                "Only the reader study may be dispositioned not-required with signed rationale."
+            )
+    return len(rows)
+
+
+def verify_clinical_release_evidence(root: Path) -> None:
+    """Fail closed if draft/templates are presented as completed clinical evidence."""
+    validate_model_validation_controls(root)
+    register = root / "docs/medical-device/model-data/CLINICAL_STUDY_REGISTER.csv"
+    with register.open(newline="", encoding="utf-8") as stream:
+        rows = {row["study_id"]: row for row in csv.DictReader(stream)}
+    required_closed = {"PV-INT-001", "PV-RR-001", "PV-EXT-001", "PV-PRO-001"}
+    incomplete = [
+        identifier
+        for identifier in sorted(required_closed)
+        if rows[identifier]["status"] != "closed"
+    ]
+    reader_status = rows["PV-RDR-001"]["status"]
+    if reader_status not in {"closed", "not_required_approved"}:
+        incomplete.append("PV-RDR-001")
+    if incomplete:
+        raise MedicalEvidenceError(
+            f"Clinical release evidence is not completed and approved: {incomplete}"
+        )
+    completed_ids = set(required_closed)
+    if reader_status == "closed":
+        completed_ids.add("PV-RDR-001")
+    unsuccessful = [
+        identifier
+        for identifier in sorted(completed_ids)
+        if rows[identifier]["result"].strip().lower()
+        not in {"passed", "met_acceptance_criteria"}
+    ]
+    if unsuccessful:
+        raise MedicalEvidenceError(
+            f"Clinical studies did not record approved success: {unsuccessful}"
+        )
+    candidate_hashes = {
+        rows[identifier]["candidate_model_sha256"].strip().lower()
+        for identifier in completed_ids
+    }
+    if len(candidate_hashes) != 1:
+        raise MedicalEvidenceError(
+            "Completed clinical studies do not evaluate one identical frozen candidate."
+        )
+    candidate_hash = next(iter(candidate_hashes))
+    model_card_path = root / "docs/medical-device/model-data/FROZEN_MODEL_CARD.json"
+    if not model_card_path.is_file():
+        raise MedicalEvidenceError("Clinical release has no completed frozen model card.")
+    model_card = _load_json(model_card_path)
+    model = model_card.get("model")
+    software = model_card.get("software")
+    data = model_card.get("data")
+    if (
+        model_card.get("schema_version") != 1
+        or model_card.get("status") != "frozen"
+        or not isinstance(model, dict)
+        or not _is_sha256(str(model.get("sha256", "")))
+        or str(model.get("sha256", "")).strip().lower() != candidate_hash
+        or not isinstance(software, dict)
+        or not str(software.get("source_commit", "")).strip()
+        or not isinstance(data, dict)
+        or not _is_sha256(str(data.get("internal_test_manifest_sha256", "")))
+        or not model_card.get("quality_approval")
+    ):
+        raise MedicalEvidenceError("Completed frozen model card is incomplete or invalid.")
 
 
 def validate_record_templates(root: Path) -> int:
@@ -448,6 +703,7 @@ def validate(root: Path) -> tuple[int, int, int]:
     documents = validate_document_index(root, medical_root / "DOCUMENT_INDEX.csv")
     gates = validate_release_manifest(root, medical_root / "RELEASE_READINESS.json")
     validate_model_evidence(medical_root / "model-data" / "RESEARCH_EVIDENCE_SNAPSHOT.json")
+    validate_model_validation_controls(root)
     workstreams = validate_execution_workstreams(
         root,
         medical_root / "EXECUTION_WORKSTREAMS.json",

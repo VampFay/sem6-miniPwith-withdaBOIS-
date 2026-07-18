@@ -1,6 +1,6 @@
 # Medical Deployment Priority Status
 
-**Status date:** 2026-07-17. **Overall disposition:** release blocked; research use only. “Implemented”
+**Status date:** 2026-07-18. **Overall disposition:** release blocked; research use only. “Implemented”
 below means repository-controlled engineering or a draft protocol exists. It never means a study,
 QMS approval, site qualification or regulatory authorization occurred.
 
@@ -11,7 +11,7 @@ legal-manufacturer/intended-use governance through daily professional use. Each 
 execution plan, objective-record template, dependency graph and explicit exit criteria. CI rejects
 missing workstreams/templates, invalid schemas, dependency cycles, false clinical authorization,
 false readiness with unassigned accountability, and removal or downgrading of a critical daily-use
-control. The controlled document index now covers 58 artifacts.
+control. The controlled document index now covers 68 artifacts.
 
 Open/blocking: all ten workstreams remain `execution_pending`; their owners and approvers are still
 unassigned. The execution plans and blank record systems must be instantiated by the accountable
@@ -42,15 +42,28 @@ documented vulnerability disposition remain mandatory.
 
 ## Priority 2 — Model and data evidence
 
-Implemented: verified dataset/checkpoint/training-log evidence generator; tracked hash-bound snapshot;
-dataset/model license register; model/data dossier, reference standard, statistical plan and staged
-internal/external/prospective evidence protocol.
+Implemented: verified dataset/checkpoint/training-log evidence generator; tracked hash-bound
+snapshot; dataset/model license register; controlled metric dictionary; performance protocol and
+patient-clustered SAP; predeclared internal, repeatability, external, prospective, reader and
+topology study records; frozen-model and pseudonymous evaluation-manifest templates. The executable
+analysis layer records classic AJI, AJI+, PQ/SQ/RQ, object TP/FP/FN, detection precision/recall/F1,
+count errors, object FP/FN rates, failure-to-return, per-object/per-region sufficient statistics,
+patient/slide/site denominators, tissue/scanner/stain/density/edge/artifact groups and deterministic
+site-stratified patient-cluster confidence intervals. A separate-cohort calibration evaluator
+records Brier/ECE, failure-detection AUROC/AUPRC, risk-coverage and false reassurance. CI rejects a
+draft study presented as executed and the release gate requires completed approved studies and a
+frozen model card rather than accepting blank templates. The repeatability/reproducibility analyzer
+records count ICC(2,1), within-condition CV, output-hash agreement, Bland-Altman bias/limits and
+paired AJI+/PQ shifts across locked conditions.
 
-Open/blocking: PanNuke is declared CC BY-NC-SA 4.0; current derived weights lack commercial clearance;
-only 49/150 epochs are recorded; no locked fold-3 result, independent multi-site validation,
-prospective validation, clinical utility study or residual-risk acceptance exists. Acquire permitted
-representative data, train/freeze a new candidate, preregister and execute studies with qualified
-pathologists and biostatisticians.
+Open/blocking: PanNuke is declared CC BY-NC-SA 4.0; current derived weights lack commercial
+clearance; only 49/150 epochs are recorded. A historical 2,722-patch fold-3 result exists for a
+different checkpoint, but it was already observed, used an earlier match boundary and lacks
+patient/slide/site hierarchy; it is not an untouched clinical test. The current candidate has no
+locked internal patient-level test, independent multi-site validation, prospective validation,
+reader/utility result, calibrated uncertainty claim or residual-risk acceptance. Acquire permitted
+representative data, train/freeze a new candidate, approve acceptance criteria, and execute the
+predeclared studies with qualified pathologists and biostatisticians.
 
 ## Priority 3 — QMS
 
@@ -94,7 +107,11 @@ use errors; approve market-specific labeling and create user competence records.
 ## Priority 7 — Site deployment qualification
 
 Implemented: risk-based IQ/OQ/PQ, backup/restore/DR/rollback and requalification protocol plus an
-objective site acceptance checklist tied to the controlled runtime and load harness.
+objective site acceptance checklist tied to the controlled runtime and load harness. A frozen
+topology manifest and direct inference benchmark bind model/topology/input hashes to cold-load time,
+map/postprocessing/end-to-end latency, p50/p90/p95/p99/max, sequential throughput, RSS/VRAM and
+repeat-output hashes. The API harness separately records concurrent throughput, failures and tail
+latency.
 
 Open/blocking: no production site or topology has executed it. Each site must provide approved
 infrastructure, run and retain raw IQ/OQ/PQ evidence, close deviations, train users, pass security/

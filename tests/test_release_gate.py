@@ -1,5 +1,6 @@
 import hashlib
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -12,6 +13,8 @@ from scripts.release_gate import (
     verify_release_disposition,
     verify_sbom_receipt,
 )
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def write_manifest(
@@ -80,6 +83,29 @@ def test_approved_gate_accepts_dated_review_and_evidence(tmp_path: Path) -> None
         },
     )
     assert load_release_gates(manifest, tmp_path)[0].status == "approved"
+
+
+def test_clinical_gate_rejects_draft_studies_and_templates(tmp_path: Path) -> None:
+    shutil.copytree(
+        ROOT / "docs/medical-device",
+        tmp_path / "docs/medical-device",
+    )
+    manifest = tmp_path / "readiness.json"
+    write_manifest(
+        manifest,
+        {
+            "id": "CLINICAL",
+            "title": "Clinical validation",
+            "required": True,
+            "status": "approved",
+            "owner": "clinical-lead",
+            "evidence": ["docs/medical-device/CLINICAL_EVALUATION.md"],
+            "approver": "independent-clinical-reviewer",
+            "approved_at": "2026-07-18T10:00:00Z",
+        },
+    )
+    with pytest.raises(ReleaseGateError, match="lacks completed controlled evidence"):
+        load_release_gates(manifest, tmp_path)
 
 
 def test_approved_gate_rejects_evidence_outside_repository(tmp_path: Path) -> None:

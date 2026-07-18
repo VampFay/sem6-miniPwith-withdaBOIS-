@@ -192,3 +192,17 @@ python -m scripts.benchmark_topology MODEL.pt REPRESENTATIVE_IMAGE.tif \
 
 Direct sequential inference benchmarking does not replace the API concurrency, capacity, soak,
 failure-recovery or site OQ tests. Both layers are required for an approved topology.
+
+Repeated runs or rescans across controlled conditions use
+`REPEATABILITY_INPUT.template.csv`. Each output hash is the exact instance result for that
+item/condition/replicate:
+
+```bash
+python -m scripts.analyze_repeatability REPEATABILITY.csv \
+  --output CONTROLLED_OUTPUT/PV-RR-001 --study-id PV-RR-001 \
+  --candidate-sha256 MODEL_SHA256
+```
+
+The analysis records ICC(2,1) for counts across balanced conditions, within-condition count
+variation, exact-output agreement, two-condition Bland-Altman bias/limits and paired AJI+/PQ shifts.
+The study protocol must define items, conditions, replicates and acceptance limits before execution.

@@ -13,7 +13,9 @@ from scripts.validate_medical_evidence import (
     validate,
     validate_document_index,
     validate_execution_workstreams,
+    validate_model_validation_controls,
     validate_record_templates,
+    verify_clinical_release_evidence,
 )
 
 FIELDS = [
@@ -82,7 +84,116 @@ def test_document_index_accepts_controlled_draft(tmp_path: Path) -> None:
 
 
 def test_repository_has_all_controlled_execution_workstreams() -> None:
-    assert validate(ROOT) == (67, 13, 10)
+    assert validate(ROOT) == (68, 13, 10)
+    assert validate_model_validation_controls(ROOT) == 6
+
+
+def _copy_medical_controls(tmp_path: Path) -> Path:
+    shutil.copytree(
+        ROOT / "docs/medical-device",
+        tmp_path / "docs/medical-device",
+    )
+    return tmp_path
+
+
+def test_draft_study_cannot_claim_execution_or_results(tmp_path: Path) -> None:
+    root = _copy_medical_controls(tmp_path)
+    register = root / "docs/medical-device/model-data/CLINICAL_STUDY_REGISTER.csv"
+    with register.open(newline="", encoding="utf-8") as stream:
+        rows = list(csv.DictReader(stream))
+    rows[0]["result"] = "passed"
+    with register.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    with pytest.raises(MedicalEvidenceError, match="execution or approval claims"):
+        validate_model_validation_controls(root)
+
+
+def test_reported_study_requires_frozen_hashes_and_approvers(tmp_path: Path) -> None:
+    root = _copy_medical_controls(tmp_path)
+    register = root / "docs/medical-device/model-data/CLINICAL_STUDY_REGISTER.csv"
+    with register.open(newline="", encoding="utf-8") as stream:
+        rows = list(csv.DictReader(stream))
+    rows[0]["status"] = "reported"
+    rows[0]["result"] = "passed"
+    rows[0]["report_id"] = "REPORT-1"
+    with register.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    with pytest.raises(MedicalEvidenceError, match="candidate/dataset hashes"):
+        validate_model_validation_controls(root)
+
+
+def test_current_draft_studies_cannot_satisfy_clinical_release_gate() -> None:
+    with pytest.raises(MedicalEvidenceError, match="not completed and approved"):
+        verify_clinical_release_evidence(ROOT)
+
+
+def _write_completed_clinical_evidence(root: Path) -> Path:
+    register = root / "docs/medical-device/model-data/CLINICAL_STUDY_REGISTER.csv"
+    with register.open(newline="", encoding="utf-8") as stream:
+        rows = list(csv.DictReader(stream))
+    required = {"PV-INT-001", "PV-RR-001", "PV-EXT-001", "PV-PRO-001"}
+    for row in rows:
+        if row["study_id"] in required:
+            row.update(
+                {
+                    "status": "closed",
+                    "candidate_model_sha256": "a" * 64,
+                    "dataset_manifest_sha256": "b" * 64,
+                    "first_subject_or_analysis_date": "2026-01-01",
+                    "database_lock_date": "2026-02-01",
+                    "report_id": f"REPORT-{row['study_id']}",
+                    "result": "met_acceptance_criteria",
+                    "clinical_statistical_approvers": "clinical-lead;biostatistician",
+                    "approval_date": "2026-03-01",
+                }
+            )
+        elif row["study_id"] == "PV-RDR-001":
+            row.update(
+                {
+                    "status": "not_required_approved",
+                    "result": "approved claim-based not-required rationale",
+                    "clinical_statistical_approvers": "clinical-lead;biostatistician",
+                    "approval_date": "2026-03-01",
+                }
+            )
+    with register.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+
+    template = root / "docs/medical-device/model-data/FROZEN_MODEL_CARD.template.json"
+    model_card = json.loads(template.read_text(encoding="utf-8"))
+    model_card["status"] = "frozen"
+    model_card["candidate_id"] = "CANDIDATE-1"
+    model_card["model"]["sha256"] = "a" * 64
+    model_card["software"]["source_commit"] = "f" * 40
+    model_card["data"]["internal_test_manifest_sha256"] = "b" * 64
+    model_card["quality_approval"] = "quality-manager@2026-03-01"
+    path = root / "docs/medical-device/model-data/FROZEN_MODEL_CARD.json"
+    path.write_text(json.dumps(model_card), encoding="utf-8")
+    return register
+
+
+def test_completed_clinical_evidence_must_bind_one_frozen_candidate(
+    tmp_path: Path,
+) -> None:
+    root = _copy_medical_controls(tmp_path)
+    register = _write_completed_clinical_evidence(root)
+    verify_clinical_release_evidence(root)
+
+    with register.open(newline="", encoding="utf-8") as stream:
+        rows = list(csv.DictReader(stream))
+    rows[1]["candidate_model_sha256"] = "c" * 64
+    with register.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    with pytest.raises(MedicalEvidenceError, match="one identical frozen candidate"):
+        verify_clinical_release_evidence(root)
 
 
 def _write_execution_manifest(tmp_path: Path, payload: dict[str, object]) -> Path:

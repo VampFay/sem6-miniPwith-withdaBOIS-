@@ -9,6 +9,10 @@ from pathlib import Path
 from typing import Any, Literal
 
 from scripts.generate_sbom import SbomGenerationError, sha256_file, validate_sbom
+from scripts.validate_medical_evidence import (
+    MedicalEvidenceError,
+    verify_clinical_release_evidence,
+)
 from src.provenance import AuditStore
 from src.runtime import RuntimeConfig, RuntimeConfigurationError, read_verified_checkpoint
 
@@ -98,6 +102,13 @@ def load_release_gates(manifest: Path, root: Path) -> list[ReleaseGate]:
             raise ReleaseGateError(
                 f"Approved gate {gate.gate_id} references missing evidence: {missing}"
             )
+        if gate.gate_id == "CLINICAL":
+            try:
+                verify_clinical_release_evidence(root)
+            except MedicalEvidenceError as error:
+                raise ReleaseGateError(
+                    f"Approved CLINICAL gate lacks completed controlled evidence: {error}"
+                ) from error
     return gates
 
 

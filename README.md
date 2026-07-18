@@ -121,6 +121,16 @@ Jaccard value as AJI+; the corrected evaluator reports classic AJI and AJI+ sepa
 Method details are in [docs/METHODOLOGY.md](docs/METHODOLOGY.md). The current baseline must remain
 fixed while new choices are developed on fold 2; fold 3 is not an iterative tuning set.
 
+## Controlled Validation Tooling
+
+The repository includes a draft protocol, SAP, metric dictionary and executable tooling for
+patient/slide-aware scoring, subgroup/failure analysis, separate-cohort uncertainty calibration and
+frozen CPU/GPU topology benchmarking. Start with
+[the performance validation protocol](docs/medical-device/model-data/PERFORMANCE_VALIDATION_PROTOCOL.md).
+These tools generate hash-bound analysis outputs that still require independent review and signed
+study controls. No external, prospective, reader, repeatability or clinical-topology study has been
+executed, and no generated output authorizes medical use.
+
 ## Deployment
 
 The production container serves the compiled React workstation and FastAPI under one origin. It
