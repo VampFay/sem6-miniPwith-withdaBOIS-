@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "status": "template_not_frozen",
+  "candidate_id": null,
+  "intended_use_revision": null,
+  "model": {
+    "artifact_path_or_controlled_uri": null,
+    "sha256": null,
+    "safe_format": null,
+    "architecture": null,
+    "training_receipt_sha256": null
+  },
+  "software": {
+    "source_commit": null,
+    "container_digest": null,
+    "dependency_lock_sha256": null,
+    "sbom_sha256": null,
+    "configuration_sha256": null
+  },
+  "data": {
+    "development_manifest_sha256": null,
+    "tuning_manifest_sha256": null,
+    "internal_test_manifest_sha256": null,
+    "patient_slide_site_leakage_check_sha256": null,
+    "commercial_and_clinical_permission_record": null
+  },
+  "inference": {
+    "input_contract_revision": null,
+    "preprocessing_revision": null,
+    "postprocessing": null,
+    "match_iou_strictly_greater_than": 0.5,
+    "metric_dictionary_revision": "MD-MDE-006@0.1",
+    "uncertainty_calibrator_sha256": null
+  },
+  "supported_topology_ids": [],
+  "known_limitations": [],
+  "unsupported_uses": [],
+  "frozen_at": null,
+  "frozen_by": null,
+  "independent_reviewer": null,
+  "quality_approval": null
+}

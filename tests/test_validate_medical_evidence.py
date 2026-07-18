@@ -82,7 +82,7 @@ def test_document_index_accepts_controlled_draft(tmp_path: Path) -> None:
 
 
 def test_repository_has_all_controlled_execution_workstreams() -> None:
-    assert validate(ROOT) == (58, 13, 10)
+    assert validate(ROOT) == (63, 13, 10)
 
 
 def _write_execution_manifest(tmp_path: Path, payload: dict[str, object]) -> Path:
