@@ -19,7 +19,9 @@ class LoadSummary:
     elapsed_seconds: float
     throughput_per_second: float
     latency_p50_ms: float
+    latency_p90_ms: float
     latency_p95_ms: float
+    latency_p99_ms: float
     latency_max_ms: float
 
 
@@ -41,7 +43,9 @@ def summarize(latencies: list[float], failures: int, elapsed: float) -> LoadSumm
         elapsed_seconds=elapsed,
         throughput_per_second=requests / elapsed if elapsed else 0.0,
         latency_p50_ms=percentile(milliseconds, 0.50),
+        latency_p90_ms=percentile(milliseconds, 0.90),
         latency_p95_ms=percentile(milliseconds, 0.95),
+        latency_p99_ms=percentile(milliseconds, 0.99),
         latency_max_ms=max(milliseconds, default=0.0),
     )
 

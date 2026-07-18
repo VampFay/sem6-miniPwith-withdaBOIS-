@@ -167,3 +167,28 @@ The command refuses to overwrite an existing evidence directory, hashes every ev
 prediction array, emits per-object and per-region sufficient statistics, and labels its output as
 requiring independent review. Quality-controlled archival, signatures and release disposition
 remain external process controls.
+
+Uncertainty calibration and held-out evaluation use disjoint patients and the two controlled input
+templates. The score must already have a locked probability-of-correctness interpretation; TTA
+disagreement is not eligible merely by renaming it:
+
+```bash
+python -m scripts.evaluate_uncertainty \
+  --calibration CALIBRATION.csv --evaluation HELD_OUT.csv \
+  --output CONTROLLED_OUTPUT/PV-UNC-001 --study-id PV-UNC-001 \
+  --candidate-sha256 MODEL_SHA256 --score-name LOCKED_SCORE_NAME \
+  --action-threshold PRESPECIFIED_THRESHOLD
+```
+
+Each exact CPU/GPU configuration is copied from
+`site/TOPOLOGY_MANIFEST.template.json`, completed, approved and changed to `status: frozen` before:
+
+```bash
+python -m scripts.benchmark_topology MODEL.pt REPRESENTATIVE_IMAGE.tif \
+  --topology-manifest FROZEN_TOPOLOGY.json \
+  --output CONTROLLED_OUTPUT/PV-TOP-001 --study-id PV-TOP-001 \
+  --device cpu
+```
+
+Direct sequential inference benchmarking does not replace the API concurrency, capacity, soak,
+failure-recovery or site OQ tests. Both layers are required for an approved topology.

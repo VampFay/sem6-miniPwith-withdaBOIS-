@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "status": "template_not_frozen",
+  "topology_id": null,
+  "device_type": null,
+  "model_sha256": null,
+  "source_commit": null,
+  "configuration_sha256": null,
+  "hardware": {
+    "manufacturer_model": null,
+    "cpu": null,
+    "gpu": null,
+    "ram_bytes": null,
+    "storage": null,
+    "network": null
+  },
+  "software": {
+    "os": null,
+    "kernel": null,
+    "container_digest": null,
+    "python": null,
+    "torch": null,
+    "cuda_driver_runtime": null
+  },
+  "runtime_controls": {
+    "threads": null,
+    "batch_size": 1,
+    "concurrency": null,
+    "tile_size": 256,
+    "overlap": 64,
+    "tta": false,
+    "power_and_thermal_policy": null
+  },
+  "frozen_at": null,
+  "frozen_by": null,
+  "independent_reviewer": null
+}
