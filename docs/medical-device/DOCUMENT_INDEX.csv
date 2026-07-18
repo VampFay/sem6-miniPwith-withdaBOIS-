@@ -29,6 +29,7 @@ MD-MDE-005,Model performance statistical analysis plan,docs/medical-device/model
 MD-MDE-006,Controlled model-performance metric dictionary,docs/medical-device/model-data/METRIC_DEFINITIONS.md,0.1,draft,model-verification-unassigned,pathology-statistics-unassigned,
 MD-MDE-FRM-003,Subgroup and failure taxonomy,docs/medical-device/model-data/SUBGROUP_AND_FAILURE_TAXONOMY.csv,0.1,template,clinical-validation-unassigned,clinical-safety-and-statistics-unassigned,
 MD-MDE-FRM-004,Frozen model card template,docs/medical-device/model-data/FROZEN_MODEL_CARD.template.json,1,template,model-owner-unassigned,quality-manager-unassigned,
+MD-MDE-FRM-005,Clinical evaluation manifest template,docs/medical-device/model-data/EVALUATION_MANIFEST.template.csv,0.1,template,clinical-validation-lead-unassigned,statistics-unassigned,
 MD-QM-001,Quality manual,docs/medical-device/qms/QUALITY_MANUAL.md,0.1,draft,quality-manager-unassigned,legal-manufacturer-unassigned,
 MD-SOP-001,Document record and training control,docs/medical-device/qms/SOP_DOCUMENT_AND_RECORD_CONTROL.md,0.1,draft,quality-manager-unassigned,legal-manufacturer-unassigned,
 MD-SOP-002,Design risk change and release,docs/medical-device/qms/SOP_DESIGN_RISK_CHANGE_RELEASE.md,0.1,draft,quality-manager-unassigned,clinical-safety-and-regulatory-unassigned,

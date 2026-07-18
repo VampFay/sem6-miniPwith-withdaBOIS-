@@ -24,6 +24,38 @@ class InstanceMetrics:
     recognition_quality: float
 
 
+@dataclass(frozen=True)
+class ClinicalInstanceMetrics:
+    aji: float
+    aji_plus: float
+    pq: float
+    segmentation_quality: float
+    recognition_quality: float
+    true_positive: int
+    false_positive: int
+    false_negative: int
+    detection_precision: float
+    detection_recall: float
+    detection_f1: float
+    reference_count: int
+    predicted_count: int
+    signed_count_error: int
+    absolute_count_error: int
+    relative_count_error: float | None
+    object_false_positive_rate: float
+    object_false_negative_rate: float
+
+
+@dataclass(frozen=True)
+class ObjectMatch:
+    truth_id: int | None
+    prediction_id: int | None
+    intersection: int
+    union: int
+    iou: float
+    status: str
+
+
 def calculate_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
     true = np.asarray(y_true, dtype=bool)
     pred = np.asarray(y_pred, dtype=bool)
@@ -181,3 +213,121 @@ def calculate_instance_metrics(
         segmentation_quality=segmentation_quality,
         recognition_quality=recognition_quality,
     )
+
+
+def calculate_clinical_instance_metrics(
+    gt_instances: np.ndarray,
+    pred_instances: np.ndarray,
+    match_iou: float = 0.5,
+) -> tuple[ClinicalInstanceMetrics, list[ObjectMatch]]:
+    """Return auditable object-level metrics and one row for every TP, FP, and FN.
+
+    Matching follows the controlled strict ``IoU > match_iou`` rule. Assignments that do not
+    exceed the threshold produce one false-negative and one false-positive rather than a match.
+    """
+    if not 0 < match_iou <= 1:
+        raise ValueError("match_iou must be in the interval (0, 1]")
+    truth = np.asarray(gt_instances)
+    prediction = np.asarray(pred_instances)
+    intersections, unions, true_areas, pred_areas, iou = _overlap_table(truth, prediction)
+    true_ids = [int(value) for value in np.unique(truth) if value > 0]
+    pred_ids = [int(value) for value in np.unique(prediction) if value > 0]
+    rows, columns = linear_sum_assignment(-iou) if iou.size else (np.array([]), np.array([]))
+    accepted = [
+        (int(row), int(column))
+        for row, column in zip(rows, columns, strict=True)
+        if iou[row, column] > match_iou
+    ]
+    accepted_rows = {row for row, _ in accepted}
+    accepted_columns = {column for _, column in accepted}
+    matches = [
+        ObjectMatch(
+            truth_id=true_ids[row],
+            prediction_id=pred_ids[column],
+            intersection=int(intersections[row, column]),
+            union=int(unions[row, column]),
+            iou=float(iou[row, column]),
+            status="true_positive",
+        )
+        for row, column in accepted
+    ]
+    matches.extend(
+        ObjectMatch(
+            truth_id=true_ids[row],
+            prediction_id=None,
+            intersection=0,
+            union=int(true_areas[row]),
+            iou=0.0,
+            status="false_negative",
+        )
+        for row in range(len(true_ids))
+        if row not in accepted_rows
+    )
+    matches.extend(
+        ObjectMatch(
+            truth_id=None,
+            prediction_id=pred_ids[column],
+            intersection=0,
+            union=int(pred_areas[column]),
+            iou=0.0,
+            status="false_positive",
+        )
+        for column in range(len(pred_ids))
+        if column not in accepted_columns
+    )
+
+    true_positive = len(accepted)
+    false_positive = len(pred_ids) - true_positive
+    false_negative = len(true_ids) - true_positive
+    both_empty = not true_ids and not pred_ids
+    precision_denominator = true_positive + false_positive
+    recall_denominator = true_positive + false_negative
+    f1_denominator = 2 * true_positive + false_positive + false_negative
+    recognition_denominator = true_positive + 0.5 * (false_positive + false_negative)
+    matched_ious = [float(iou[row, column]) for row, column in accepted]
+    segmentation_quality = (
+        1.0 if both_empty else float(np.mean(matched_ious)) if matched_ious else 0.0
+    )
+    recognition_quality = (
+        1.0 if both_empty else true_positive / recognition_denominator
+        if recognition_denominator
+        else 0.0
+    )
+    reference_count = len(true_ids)
+    predicted_count = len(pred_ids)
+    signed_count_error = predicted_count - reference_count
+    metrics = ClinicalInstanceMetrics(
+        aji=_aji_from_overlaps(intersections, unions, true_areas, pred_areas, iou),
+        aji_plus=_aji_plus_from_overlaps(intersections, unions, true_areas, pred_areas, iou),
+        pq=segmentation_quality * recognition_quality,
+        segmentation_quality=segmentation_quality,
+        recognition_quality=recognition_quality,
+        true_positive=true_positive,
+        false_positive=false_positive,
+        false_negative=false_negative,
+        detection_precision=(
+            1.0 if both_empty else true_positive / precision_denominator
+            if precision_denominator
+            else 0.0
+        ),
+        detection_recall=(
+            1.0 if not true_ids else true_positive / recall_denominator
+        ),
+        detection_f1=1.0 if both_empty else 2 * true_positive / f1_denominator
+        if f1_denominator
+        else 0.0,
+        reference_count=reference_count,
+        predicted_count=predicted_count,
+        signed_count_error=signed_count_error,
+        absolute_count_error=abs(signed_count_error),
+        relative_count_error=(
+            signed_count_error / reference_count if reference_count else None
+        ),
+        object_false_positive_rate=(
+            false_positive / precision_denominator if precision_denominator else 0.0
+        ),
+        object_false_negative_rate=(
+            false_negative / recall_denominator if recall_denominator else 0.0
+        ),
+    )
+    return metrics, matches

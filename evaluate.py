@@ -16,7 +16,7 @@ from tqdm import tqdm
 from src.config import Config, select_device
 from src.inference import AttnDistInference, PostprocessConfig
 from src.training.data import official_fold_split
-from src.utils.metrics import calculate_instance_metrics, calculate_metrics
+from src.utils.metrics import calculate_clinical_instance_metrics, calculate_metrics
 
 
 def sha256(path: Path) -> str:
@@ -95,7 +95,7 @@ def main() -> None:
         truth = instances[index]
         binary = (truth > 0).astype(np.uint8)
         semantic = calculate_metrics(binary, result["mask"] >= postprocessing.mask_threshold)
-        instance_metrics = calculate_instance_metrics(truth, result["instances"])
+        instance_metrics, _ = calculate_clinical_instance_metrics(truth, result["instances"])
         rows.append({"index": int(index), **semantic, **asdict(instance_metrics)})
 
     args.output.mkdir(parents=True, exist_ok=True)
@@ -112,6 +112,11 @@ def main() -> None:
             "sha256": sha256(args.checkpoint),
         },
         "test_samples": len(rows),
+        "inference_unit": "image_patch",
+        "confidence_interval_unit": "image_patch_research_only",
+        "medical_evidence_warning": (
+            "Patch-level intervals are not patient/slide-level clinical evidence."
+        ),
         "fold_protocol": {
             "train": config.train_fold,
             "validation": config.validation_fold,

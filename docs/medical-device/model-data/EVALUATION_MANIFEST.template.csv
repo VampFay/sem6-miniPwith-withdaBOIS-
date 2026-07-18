@@ -1,0 +1,1 @@
+site_id,patient_id,specimen_id,slide_id,scan_id,region_id,tissue_type,tumor_type,scanner_model,stain_protocol,stain_batch,density_group,edge_condition,artifact_condition,result_status,truth_path,prediction_path,failure_reason

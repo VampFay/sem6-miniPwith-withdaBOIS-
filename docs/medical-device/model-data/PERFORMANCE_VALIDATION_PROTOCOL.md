@@ -146,3 +146,24 @@ material worst-group failure, unsafe false reassurance, or unresolved clinically
 Exit requires signed pathology, statistics, clinical safety, Quality and regulatory reports plus
 residual-risk acceptance. Passing aggregate model metrics cannot substitute for external,
 prospective, human-factors, site or regulatory evidence.
+
+## Controlled analysis invocation
+
+After candidate, dataset, protocol and SAP lock, copy
+[EVALUATION_MANIFEST.template.csv](EVALUATION_MANIFEST.template.csv) into the controlled study
+workspace and populate only pseudonymous hierarchy and approved subgroup fields. Raw truth and
+prediction arrays remain outside Git. Execute:
+
+```bash
+python -m scripts.evaluate_clinical_predictions STUDY_MANIFEST.csv \
+  --data-root CONTROLLED_DATA_ROOT \
+  --output CONTROLLED_OUTPUT/PV-XXX-001 \
+  --study-id PV-XXX-001 \
+  --candidate-sha256 MODEL_SHA256 \
+  --dataset-manifest-sha256 DATASET_MANIFEST_SHA256
+```
+
+The command refuses to overwrite an existing evidence directory, hashes every evaluated truth and
+prediction array, emits per-object and per-region sufficient statistics, and labels its output as
+requiring independent review. Quality-controlled archival, signatures and release disposition
+remain external process controls.
